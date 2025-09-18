@@ -1,0 +1,97 @@
+.pill {
+  width: fit-content;
+  /* Edit below, do not touch above */
+  gap: 1;
+  display: flex; 
+  align-items: center;
+}
+
+.pill-dot {
+  width: 12px;
+  height: 12px;
+  background-color: #3178c6;
+  border-radius: 50%;
+}
+
+.pill-text {
+  margin: 6px;
+  font-size: 12px;
+}
+
+.badge {
+  width: fit-content;
+  height: fit-content;
+  /* Edit below, do not touch above */
+  font-size: 12px;
+  border: solid;
+  border-width: 1px;
+  border-color: #d1d9e0;
+  border-radius: 12px;
+  padding-left: 4px;
+  padding-right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.card {
+  width: 300px;
+  height: 160px;
+  box-sizing: border-box;
+  /* Edit below, do not touch above */
+  border: solid;
+  border-width: 2px;
+  border-color: #d1d9e0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  margin-right: 16px;
+  margin-bottom: 16px;
+}
+
+.row1 {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.row3 {
+  margin-top: auto;
+}
+
+#left {
+  width: 300px;
+  border-right: 1px solid #d1d9e0;
+  height: auto;
+  padding-left: 16px;
+  /* Edit below, do not touch above */
+}
+
+@media screen and (max-width: 700px) {
+      #left {
+        display: none;
+      }
+    }
+
+#right {
+  width: auto;
+  height: auto;
+  padding-left: 16px;
+  /* Edit below, do not touch above */
+}
+
+#main {
+  display: flex;
+  flex-direction: row;
+}
