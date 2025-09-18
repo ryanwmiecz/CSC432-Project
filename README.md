@@ -1,2 +1,6 @@
 # CSC432-Project
-Project
+
+For running the site:
+    npm install
+    npm run dev
+
