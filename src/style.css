@@ -1,97 +1,99 @@
-.pill {
-  width: fit-content;
-  /* Edit below, do not touch above */
-  gap: 1;
-  display: flex; 
-  align-items: center;
-}
-
-.pill-dot {
-  width: 12px;
-  height: 12px;
-  background-color: #3178c6;
-  border-radius: 50%;
-}
-
-.pill-text {
-  margin: 6px;
-  font-size: 12px;
-}
-
-.badge {
-  width: fit-content;
-  height: fit-content;
-  /* Edit below, do not touch above */
-  font-size: 12px;
-  border: solid;
-  border-width: 1px;
-  border-color: #d1d9e0;
-  border-radius: 12px;
-  padding-left: 4px;
-  padding-right: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cards {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.card {
-  width: 300px;
-  height: 160px;
-  box-sizing: border-box;
-  /* Edit below, do not touch above */
-  border: solid;
-  border-width: 2px;
-  border-color: #d1d9e0;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  margin-right: 16px;
-  margin-bottom: 16px;
-}
-
-.row1 {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.title {
-  font-weight: bold;
-  font-size: 18px;
-}
-
-.row3 {
-  margin-top: auto;
-}
-
-#left {
-  width: 300px;
-  border-right: 1px solid #d1d9e0;
-  height: auto;
-  padding-left: 16px;
-  /* Edit below, do not touch above */
-}
-
-@media screen and (max-width: 700px) {
-      #left {
-        display: none;
-      }
-    }
-
-#right {
-  width: auto;
-  height: auto;
-  padding-left: 16px;
-  /* Edit below, do not touch above */
-}
-
 #main {
   display: flex;
   flex-direction: row;
+}
+
+.chat{
+  display:flex;
+  flex-direction: column;
+  width: 65vw;
+  height: 95vh;
+  border-color: black;
+  border: solid;
+}
+
+
+.typeBox{
+  margin-left:auto;
+  margin-right:auto;
+  margin-bottom: 25px;
+  display:flex;
+
+  width: 70%;
+  margin-top: auto;
+  
+  border:solid;
+  border-color: black;
+}
+
+.input{
+  width: 100%;
+  height: 100%;
+}
+
+.message{
+  display: flex;
+  margin: 20px;
+  margin-left: 100px;
+}
+
+.messageText{
+  margin-left: 50px;
+}
+
+.messagePic{
+  width: 50px;
+  height: 50px;
+}
+
+.history{
+  display: flex;
+  flex-direction: column;
+
+  width: 35vw;
+  height: 95vh;
+  border-color: blueviolet;
+  border: solid;
+}
+
+.historyTitle{
+  margin-left:auto;
+  margin-right:auto;
+  height: 10;
+
+}
+
+.historyText{
+  margin-left:auto;
+  margin-right:auto;
+}
+
+.vote{
+  margin-left:auto;
+  margin-right:auto;
+  margin-top: auto;
+  border: solid;
+  border-width: 2px;
+  color: black;
+}
+
+.voteTitle{
+  margin: 10px;
+}
+
+.noVote{
+
+}
+
+.yesVote{
+
+}
+
+.buttonContainer{
+ margin: 10px;
+ margin-left:auto;
+ margin-right:auto;
+ width: 75%;
+ display: flex;
+ justify-content: space-between;
 }
