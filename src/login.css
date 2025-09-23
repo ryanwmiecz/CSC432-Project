@@ -1,0 +1,71 @@
+#main{
+    align-items: center;
+    justify-content: center;
+    display: flex;
+    flex-direction: row;
+    background-color: #4F5D75;
+    height: 90vh;
+    width: 90vw;
+    border-style: solid;
+    border-width: 30px;
+    border-color: #EF8354;
+}
+
+.loginWindow{
+    display: flex;
+    flex-direction: column;
+    height: 50%;
+    width: 30%;
+    border-radius: 30px;
+    align-items: center;
+    justify-content: center;
+    background-color: #2D3142;
+}
+
+.username{
+    height: 10%;
+    width: 75%;
+}
+
+.usernameInput{
+    height: 100%;
+    width: 100%;
+}
+
+.password{
+    margin-top: 10px;
+    height: 10%;
+    width: 75%;
+}
+
+.passwordInput{
+    height: 100%;
+    width: 100%;
+}
+
+.buttonContainer{
+    display: flex;
+    height: 50%;
+    width: 90%;
+    align-items: center;
+    justify-content: center;
+    
+}
+
+.loginButton{
+    height: 10%;
+    width: 60%;
+    margin-top: 30px;
+    background-color: #BFC0C0;
+}
+
+.signupButton{
+    height: 10%;
+    width: 60%;
+    margin-top: 10px;
+    background-color: #BFC0C0;
+}
+
+h1{
+    color: #EF8354
+}
