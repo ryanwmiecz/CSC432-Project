@@ -21,13 +21,13 @@
   margin-top: 70px;
 }
 
-.userPic {
+#userPic {
   width: 100px;
   height: 100px;
   margin-right: 50px;
 }
 
-.userName {
+#userName {
   font-size: 50px;
   color: white;
   margin-top: 25px;
@@ -38,7 +38,7 @@
   margin-left: 50px;
 }
 
-.bioText {
+#bioText {
   color: white;
 }
 
@@ -48,6 +48,14 @@
   flex-direction: column;
   margin-left: auto;
   margin-right: auto;
+}
+
+#changeNameButton {
+  width: 20vw;
+  height: 5vh;
+  background-color: #EF8354;
+  color: white;
+  margin-bottom: 10px;
 }
 
 .backButton {
