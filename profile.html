@@ -15,13 +15,15 @@
   <main id="main">
     <div class = "container">
       <div class = "user">
-        <img src = "public/vite.svg" class ="userPic" alt = "wdadad">
-        <div class = "userName">Username</div>
+        <img id ="userPic" alt = "wdadad">
+        <div id = "userName"></div>
       </div>
       <div class = "bio">
-        <div class = "bioText">User Bio</div>
+        <div id = "bioText"></div>
       </div>
       <div class="buttonContainer">
+        <input type="text" id="changeName" placeholder="Type new name">
+        <button id="changeNameButton">Change Name</button>
         <button class="backButton">Back</button>
         <button class="logoutButton">Log Out</button>
       </div>
@@ -29,6 +31,25 @@
   </main>
   <a href="login.html"> login</a>
   <a href="profile.html"> profile</a>
+
+  <script>
+    let userDict = {
+      "userName": "My Name",
+      "bio": "Hello World",
+      "img": "public/vite.svg"
+    };
+
+    document.getElementById("userName").innerHTML = userDict.userName;
+    document.getElementById("bioText").innerHTML = userDict.bio;
+    document.getElementById("userPic").src=userDict.img;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        changeNameButton.addEventListener('click', function() {
+            document.getElementById("userName").innerHTML = document.getElementById('changeName').value;
+            userDict.userName = document.getElementById('changeName').value
+        });
+    });
+  </script>
 
 </body>
 
