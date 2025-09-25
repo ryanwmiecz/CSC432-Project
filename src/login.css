@@ -55,7 +55,7 @@
 .loginButton{
     height: 10%;
     width: 60%;
-    margin-top: 30px;
+    margin-top: 10px;
     background-color: #BFC0C0;
 }
 
@@ -64,6 +64,11 @@
     width: 60%;
     margin-top: 10px;
     background-color: #BFC0C0;
+}
+.warning{
+    font-size: 15px;
+    color: red;
+    margin-top: 10px;;
 }
 
 h1{
