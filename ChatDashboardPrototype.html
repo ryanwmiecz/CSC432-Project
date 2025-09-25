@@ -287,7 +287,7 @@
         <h1>Committee Dashboard</h1>
         <div class="user-profile">
             <img src="placeholder-avatar.png" alt="Profile Picture">
-            <span>Display Name</span>
+            <span id = "myDisplayName">Display Name</span>
             <span class="status"></span>
             <button class="logout-btn">Logout</button>
         </div>
@@ -295,19 +295,19 @@
     <main>
         <aside class="sidebar">
             <h2>Online Users</h2>
-            <ul class="online-users">
-                <li>
+            <ul class="online-users" id = "onlineUsers">
+                <li class="JS_user" id="JS_user1">
                     <div class="avatar"></div>
                     <span>User1 (Chair)</span>
                     <span class="status"></span>
                     <span class="leader-symbol">★</span>
                 </li>
-                <li>
+                <li class="JS_user" id="JS_user2">
                     <div class="avatar"></div>
                     <span>User2 (Member)</span>
                     <span class="status"></span>
                 </li>
-                <li>
+                <li class="JS_user" id="JS_user3">
                     <div class="avatar"></div>
                     <span>User3 (Observer)</span>
                     <span class="status"></span>
@@ -315,15 +315,15 @@
             </ul>
             <div class="committees">
                 <h2>Committees</h2>
-                <ul>
-                    <li>Committee A</li>
-                    <li>Committee B</li>
+                <ul id = "committeeList">
+                    <li class="JS_committee" id="JS_com1">Committee A</li>
+                    <li class="JS_committee" id="JS_com2">Committee B</li>
                 </ul>
             </div>
         </aside>
         <section class="chat-section">
             <div class="chat-header">Chat Window - Current Committee</div>
-            <div class="chat-messages">
+            <div class="chat-messages" id = "messages">
                 <div class="message received">
                     <div class="sender">User1</div>
                     Hello, team!
@@ -349,10 +349,10 @@
         </section>
         <aside class="motions-section">
             <h2>Motions & Polls</h2>
-            <div class="motion">
-                <h3>Motion Title</h3>
-                <p>Description of the motion goes here.</p>
-                <div class="status">Status: In Discussion</div>
+            <div class="motion" id = "motionDisplay">
+                <h3 id="motionTitle">Motion Title</h3>
+                <p id="motionDesc">Description of the motion goes here.</p>
+                <div class="status" id="motionStatus">Status: In Discussion</div>
             </div>
             <div class="poll-interface">
                 <button>Vote Yes</button>
@@ -371,4 +371,149 @@
         </aside>
     </main>
 </body>
+
+<!--<script src = "myThing.js"></script>-->
+  
+<script>
+  
+  let IN_DISCUSSION = 1;
+  let motionStatusNames = [
+    "Invalid Status",
+    "In Discussion...",
+    "Concluding..."
+  ];
+
+  let myData = {
+    displayName: "Davy Jones",
+    id:2,
+  };
+  
+  let data = {
+    curUserId:4,
+    users:[
+      {
+        name: "Bob",
+        rank: "Chair",
+        hasStar:true,
+        id:1
+      },{
+        name: "Davy Jones",
+        rank: "Member",
+        hasStar:false,
+        id:2,
+      },{
+        name: "Cheeseman",
+        rank: "Observer",
+        hasStar:false,
+        id:3,
+      },
+    ],
+    
+    curComId:4,
+    committees:[
+      {
+        title:"Free Pony Committee",
+        id:1
+      },{
+        title:"Committee B",
+        id:2
+      },{
+        title:"Committee Monitoring Committee",
+        id:3
+      }
+    ],
+    motion:{
+      title:"Free Pony",
+      desc:"Free ponies for all!",
+      status:IN_DISCUSSION
+    },
+  };
+
+  //message, timestamp (UNIX), user owner (by id)
+  let chatHistory = [
+    {type:0, time:"10:07am", id:1, msg:"Sup team"},
+    {type:0, time:"10:10am", id:2, msg:"Salutations..."},
+    {type:0, time:"12:32pm", id:3, msg:"Ruh roh rhaggy!"},
+  ];
+
+  //Update Display Name
+  getId("myDisplayName").innerHTML = myData.displayName;
+
+  //Update Users
+  let userDisplay = getId("onlineUsers");
+  let userDisplays = userDisplay.children;
+  
+  for (let i = userDisplays.length - 1; i >= 0; i--) {
+    userDisplay.removeChild(userDisplays[i]);
+  }
+  
+  for (let i in data.users) {
+    let g = document.createElement("li");
+    let user = data.users[i];
+
+    g.innerHTML += '<div class="avatar"></div>\n';
+    g.innerHTML += '<span>' + user.name + ' (' + user.rank + ')</span>';
+    g.innerHTML += '<span class="status"></span>';
+    if (user.hasStar) {
+      g.innerHTML += '<span class="leader-symbol">★</span>';
+    }
+  
+    g.id = "JS_user" + user.id;
+    userDisplay.appendChild(g); 
+  }
+
+
+  //Update Committees
+  let committeeDisplay = getId("committeeList");
+  let committeeDisplays = committeeDisplay.children;
+  
+  for (let i = committeeDisplays.length - 1; i >= 0; i--) {
+    committeeDisplay.removeChild(committeeDisplays[i]);
+  }
+  
+  for (let i = 0; i < data.committees.length; i++) {
+    let g = document.createElement("li");
+    g.innerHTML = data.committees[i].title;
+    g.id = "JS_com" + data.committees[i].id;
+    committeeDisplay.appendChild(g);
+  }
+
+  //Update Motion Statuses
+  getId("motionTitle").innerHTML = data.motion.title;
+  getId("motionDesc").innerHTML = data.motion.desc;
+  getId("motionStatus").innerHTML = "Status: " + motionStatusNames[data.motion.status];
+
+  //update chat box
+  let messageBox = getId("messages");
+  while (messageBox.children.length > 0) {
+    console.log(messageBox.children[0]);
+    messageBox.removeChild(messageBox.children[0]);
+  }
+
+  //for (let i = chatHistory.length - 1; i >= 0; i--) {
+  console.log("my stuff");
+  for (let i = 0; i < chatHistory.length; i++) {
+    let g = document.createElement("div");
+    g.className = (chatHistory[i].id == myData.id) ? "message sent" : "message received";
+    
+    //TODO: better data structure for users list
+    g.innerHTML += '<div class="sender">' + data.users[chatHistory[i].id - 1].name + '</div>\n';
+    g.innerHTML += chatHistory[i].msg + "\n";
+    //TODO: make time unix-based and convert it to a day and time in string form
+    g.innerHTML += '<span class="timestamp">' + chatHistory[i].time + '</span>';
+    
+
+    console.log(g);
+    messageBox.appendChild(g);
+  }
+       
+  //Helper Functions
+  function getId(str) {
+    return document.getElementById(str);
+  }
+
+  function getClass(str) {
+    return document.getElementsByClassName(str);
+  }
+</script>
 </html>
