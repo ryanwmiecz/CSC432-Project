@@ -17,16 +17,18 @@
     <div class = "loginWindow">
         <h1>Login</h1>
         <div class = "username">
-            <input type = "text" class="usernameInput" placeholder = "Username" >
+            <input type = "text" class="usernameInput" placeholder = "Username" id = "usernameInfo" >
         </div>
         <div class = "password">
-            <input type = "password" class="passwordInput" placeholder = "Password" >
+            <input type = "password" class="passwordInput" placeholder = "Password" id = "passwordInfo" >
         </div>
-        <button class="loginButton">Log In</button>
-        <button class="signupButton">Sign Up</button>
+        <div class = "warning" id = "warning"></div>
+        <button class="loginButton" id = "loginButton">Log In</button>
+        <button class="signupButton" id = "signupButton">Sign Up</button>
         </div>
     </div>
   </main>
+  <script src="/src/login.js"></script>
   <a href="index.html"> index</a>
   <a href="profile.html"> profile</a>
 </body>
