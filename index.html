@@ -1,53 +1,376 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Project</title>
-  <link rel="stylesheet" href="/src/style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Committee Dashboard Prototype</title>
+    <style>
+        /* Color Palette from https://coolors.co/2d3142-bfc0c0-ffffff-ef8354-4f5d75 */
+        :root {
+            --primary-dark: #2D3142;
+            --secondary-light: #BFC0C0;
+            --white: #FFFFFF;
+            --accent-orange: #EF8354;
+            --medium-blue: #4F5D75;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--primary-dark);
+            color: var(--white);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background-color: var(--medium-blue);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-profile img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--secondary-light);
+        }
+
+        .user-profile span {
+            font-weight: bold;
+        }
+
+        .user-profile .status {
+            width: 10px;
+            height: 10px;
+            background-color: limegreen;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .logout-btn {
+            background-color: var(--accent-orange);
+            color: var(--white);
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: var(--medium-blue);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            margin-top: 0;
+            color: var(--accent-orange);
+        }
+
+        .online-users {
+            list-style: none;
+            padding: 0;
+        }
+
+        .online-users li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .online-users li .avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: var(--secondary-light);
+        }
+
+        .online-users li .status {
+            width: 8px;
+            height: 8px;
+            background-color: limegreen;
+            border-radius: 50%;
+        }
+
+        .online-users li .leader-symbol {
+            color: var(--accent-orange);
+            font-weight: bold;
+            margin-left: auto;
+        }
+
+        .committees {
+            margin-top: 1rem;
+        }
+
+        .committees ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .committees li {
+            background-color: var(--primary-dark);
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--white);
+            color: var(--primary-dark);
+        }
+
+        .chat-header {
+            background-color: var(--secondary-light);
+            padding: 1rem;
+            font-weight: bold;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            position: relative;
+        }
+
+        .message.sent {
+            align-self: flex-end;
+            background-color: var(--accent-orange);
+            color: var(--white);
+        }
+
+        .message.received {
+            align-self: flex-start;
+            background-color: var(--secondary-light);
+            color: var(--primary-dark);
+        }
+
+        .message .sender {
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 0.2rem;
+        }
+
+        .message .timestamp {
+            font-size: 0.7rem;
+            color: gray;
+            position: absolute;
+            bottom: -1.2rem;
+            right: 0;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 1rem;
+            background-color: var(--secondary-light);
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--medium-blue);
+            border-radius: 4px;
+        }
+
+        .chat-input button {
+            background-color: var(--accent-orange);
+            color: var(--white);
+            border: none;
+            padding: 0.5rem 1rem;
+            margin-left: 0.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .motions-section {
+            width: 300px;
+            background-color: var(--medium-blue);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .motions-section h2 {
+            margin-top: 0;
+            color: var(--accent-orange);
+        }
+
+        .motion {
+            background-color: var(--primary-dark);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+
+        .motion h3 {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .motion p {
+            font-size: 0.9rem;
+        }
+
+        .motion .status {
+            font-size: 0.8rem;
+            color: var(--secondary-light);
+        }
+
+        .poll-interface {
+            margin-top: 1rem;
+        }
+
+        .poll-interface button {
+            background-color: var(--accent-orange);
+            color: var(--white);
+            border: none;
+            padding: 0.5rem;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-panel {
+            margin-top: 1rem;
+            background-color: var(--primary-dark);
+            padding: 1rem;
+            border-radius: 4px;
+        }
+
+        .control-panel h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--accent-orange);
+        }
+
+        .control-panel label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+    </style>
 </head>
-
 <body>
-  <header id="header"></header>
-
-  <main id="main">
-    <div class="chat">
-      <div class = "message">
-        <img src = "public/vite.svg" class ="messagePic" alt = "wdadad">
-        <div class = "messageText">test message</div>
-      </div>
-       
-      <div class = "message">
-        <img src = "public/vite.svg" class ="messagePic" alt = "wdadad">
-        <div class = "messageText">test message</div>
-      </div>
-      <div class ="vote">
-        <h2 class="voteTitle">Vote Question</h2>
-        <div class="buttonContainer">
-          <button class="yesVote">Yes</button>
-          <button class="noVote">No</button>
+    <header>
+        <h1>Committee Dashboard</h1>
+        <div class="user-profile">
+            <img src="placeholder-avatar.png" alt="Profile Picture">
+            <span>Display Name</span>
+            <span class="status"></span>
+            <button class="logout-btn">Logout</button>
         </div>
-        
-
-
-      </div>
-
-
-      <div class="typeBox">
-        <input type = "text" class="input" placeholder = "Type a message..." >
-      </div>
-    </div>     
-    <div class="history">
-      <h1 class="historyTitle">History Title</h1>
-      <div class="historyText">History message test</div>
-    </div>
-  
-  </main>
-  <a href="login.html"> login</a>
-  <a href="profile.html"> profile</a>
-
-</body>
-
+    </header>
+    <main>
+        <aside class="sidebar">
+            <h2>Online Users</h2>
+            <ul class="online-users">
+                <li>
+                    <div class="avatar"></div>
+                    <span>User1 (Chair)</span>
+                    <span class="status"></span>
+                    <span class="leader-symbol">★</span>
+                </li>
+                <li>
+                    <div class="avatar"></div>
+                    <span>User2 (Member)</span>
+                    <span class="status"></span>
+                </li>
+                <li>
+                    <div class="avatar"></div>
+                    <span>User3 (Observer)</span>
+                    <span class="status"></span>
+                </li>
+            </ul>
+            <div class="committees">
+                <h2>Committees</h2>
+                <ul>
+                    <li>Committee A</li>
+                    <li>Committee B</li>
+                </ul>
+            </div>
+        </aside>
+        <section class="chat-section">
+            <div class="chat-header">Chat Window - Current Committee</div>
+            <div class="chat-messages">
+                <div class="message received">
+                    <div class="sender">User1</div>
+                    Hello, team!
+                    <span class="timestamp">10:15 AM</span>
+                </div>
+                <div class="message sent">
+                    <div class="sender">You</div>
+                    Hi there!
+                    <span class="timestamp">10:16 AM</span>
+                </div>
+                <div class="message received">
+                    <div class="sender">User2</div>
+                    Let's discuss the motion.
+                    <span class="timestamp">10:17 AM</span>
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" placeholder="Type your message...">
+                <button>Send</button>
+                <button>Emoji</button> <!-- Stretch goal -->
+                <button>Upload</button> <!-- Stretch goal -->
+            </div>
+        </section>
+        <aside class="motions-section">
+            <h2>Motions & Polls</h2>
+            <div class="motion">
+                <h3>Motion Title</h3>
+                <p>Description of the motion goes here.</p>
+                <div class="status">Status: In Discussion</div>
+            </div>
+            <div class="poll-interface">
+                <button>Vote Yes</button>
+                <button>Vote No</button>
+                <button>Abstain</button>
+                <button>Raise Hand (Pro)</button>
+                <button>Raise Hand (Con)</button>
+            </div>
+            <div class="control-panel">
+                <h3>Chair Controls</h3>
+                <label><input type="checkbox"> Enable Slow Mode</label>
+                <label><input type="checkbox"> Anonymous Voting</label>
+                <button>Start Vote</button>
+                <button>Record Decision</button>
+            </div>
+        </aside>
+    </main>
+    <a href="login.html"> login</a>
+    <a href="profile.html"> profile</a>
+  </body>
 </html>
