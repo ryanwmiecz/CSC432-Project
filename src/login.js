@@ -1,4 +1,5 @@
 
+
 // Login script: authenticate against the in-memory userStore (window.userStore).
 
 const loginButton = document.getElementById('loginButton');
@@ -21,7 +22,7 @@ loginButton.addEventListener('click', function () {
 
     const user = window.userStore ? window.userStore.getUser(username) : null;
     if (user && user.password === password) {
-        // Authentication successful. Store in-memory.
+        // Authentication successful. Store in-memory for this session.
         window.currentUser = username;
         window.location.href = 'profile.html';
         return;
