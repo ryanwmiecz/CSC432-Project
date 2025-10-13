@@ -25,14 +25,30 @@ export default function App() {
     },
   });
 
-  const [chatHistory] = useState([
-    { time: "10:07am", id: 1, msg: "Sup team" },
-    { time: "10:10am", id: 2, msg: "Salutations..." },
-    { time: "12:32pm", id: 3, msg: "Ruh roh rhaggy!" },
-  ]);
+  
+  let chatHistory = window.localStorage.getItem("msgHistory");
+  if (chatHistory == null) {
+    [chatHistory] = useState([
+      { time: "10:07am", id: 1, msg: "Sup team" },
+      { time: "10:10am", id: 2, msg: "Salutations..." },
+      { time: "12:32pm", id: 3, msg: "Ruh roh rhaggy!" },
+    ]);
+  } else {
+    [chatHistory] = useState(JSON.parse(chatHistory));
+  }
 
-  const [messageInput, setMessageInput] = useState("");
+  let inputString = window.localStorage.getItem("inputString");
+  window.localStorage.setItem("inputString", " ");
+  if (inputString == null) {inputString = "";}
+  const [messageInput, setMessageInput] = useState(inputString);
   const [messages, setMessages] = useState(chatHistory);
+
+  setTimeout(() => {
+    try {
+      window.localStorage.setItem("inputString", document.getElementById("messageToSend").value);
+    } catch(e) {
+    }
+  }, 100);
 
   const sendMessage = () => {
     if (!messageInput.trim()) return;
@@ -43,6 +59,7 @@ export default function App() {
     };
     setMessages([...messages, newMsg]);
     setMessageInput("");
+    window.localStorage.setItem("msgHistory", JSON.stringify([...messages, newMsg]));
   };
 
   return (
@@ -102,6 +119,7 @@ export default function App() {
           </div>
           <div className="chat-input">
             <input
+              id = "messageToSend"
               type="text"
               placeholder="Type your message..."
               value={messageInput}
