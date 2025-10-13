@@ -372,5 +372,12 @@
     </main>
     <a href="login.html"> login</a>
     <a href="profile.html"> profile</a>
+
+    <script src="/src/users.js"></script>
+    <script>
+        if (window.userStore && !window.userStore.getCurrentUser()) {
+            window.location.href = 'login.html';
+            }
+    </script>
   </body>
 </html>
