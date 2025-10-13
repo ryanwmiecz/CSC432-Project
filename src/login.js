@@ -13,7 +13,7 @@ if (!window.userStore) {
 loginButton.addEventListener('click', function () {
     warning.textContent = '';
     const username = document.getElementById('usernameInfo').value && document.getElementById('usernameInfo').value.trim();
-    const password = document.getElementById('passwordInfo').value;
+    const password = document.getElementById('passwordInfo').value && document.getElementById('passwordInfo').value.trim();
 
     if (!username || !password) {
         warning.textContent = 'Enter both username and password.';
@@ -23,7 +23,7 @@ loginButton.addEventListener('click', function () {
     const user = window.userStore ? window.userStore.getUser(username) : null;
     if (user && user.password === password) {
         // Authentication successful. Store in-memory for this session.
-        window.currentUser = username;
+        window.userStore.setCurrentUser(username);
         window.location.href = 'profile.html';
         return;
     }

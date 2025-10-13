@@ -58,6 +58,14 @@
   margin-bottom: 10px;
 }
 
+#changeBioButton {
+  width: 20vw;
+  height: 5vh;
+  background-color: #EF8354;
+  color: white;
+  margin-bottom: 10px;
+}
+
 .backButton {
   width: 20vw;
   height: 5vh;
