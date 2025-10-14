@@ -2,6 +2,18 @@ import React, { useState, useEffect } from "react";
 import "./App.css"; // we'll move your CSS here
 
 export default function App() {
+  // If there's no current user, send the browser to the standalone login page.
+  useEffect(() => {
+    try {
+      if (!window.userStore || !window.userStore.getCurrentUser()) {
+        // Use top-level navigation to go to the non-React login page used in the project.
+        window.location.href = '/login.html';
+      }
+    } catch (e) {
+      // If anything goes wrong, don't block rendering — fail open.
+      console.warn('Error checking auth state', e);
+    }
+  }, []);
   const IN_DISCUSSION = 1;
   const motionStatusNames = ["Invalid Status", "In Discussion...", "Concluding..."];
 
