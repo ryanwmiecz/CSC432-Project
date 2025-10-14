@@ -2,16 +2,16 @@
 // This is intentionally non-persistent and will be lost on page reload/navigation.
 // It mimics a future database-backed store for development.
 
-// Load users from sessionStorage when available so signups persist across navigation in the same tab.
-// This keeps data only for the session (cleared when the tab/window is closed).
+// Load users from localStorage when available so signups persist across browser restarts.
+// localStorage keeps data across browser sessions (until explicitly cleared).
 let _loadedUsers = null;
 try {
-  const raw = sessionStorage.getItem('users');
+  const raw = localStorage.getItem('users');
   if (raw) {
     _loadedUsers = JSON.parse(raw);
   }
 } catch (e) {
-  console.warn('Could not read users from sessionStorage', e);
+  console.warn('Could not read users from localStorage', e);
 }
 
 window.users = window.users || _loadedUsers || {};
@@ -26,15 +26,15 @@ window.users["admin"] = {
 window.currentUser = undefined;
 
 try {
-    const storedCurrentUser = sessionStorage.getItem('currentUser');
-    if (storedCurrentUser) {
-        window.currentUser = window.users[storedCurrentUser];
-    } else {
-        // User was in sessionStorage but not in the users dictionary (e.g., dictionary was reset)
-        sessionStorage.removeItem('currentUser');
-    }
+  const storedCurrentUser = localStorage.getItem('currentUser');
+  if (storedCurrentUser) {
+    window.currentUser = window.users[storedCurrentUser];
+  } else {
+    // User was in storage but not in the users dictionary (e.g., dictionary was reset)
+    localStorage.removeItem('currentUser');
+  }
 } catch (e) {
-    console.warn('Could not restore user session from sessionStorage', e);
+  console.warn('Could not restore user session from localStorage', e);
 }
 
 window.userStore = {
@@ -47,11 +47,11 @@ window.userStore = {
       "bio": "Hello World",
       "img": "public/vite.svg"
     };
-    // Persist to sessionStorage so new users survive navigation in this tab.
+    // Persist to localStorage so new users survive browser restarts.
     try {
-      sessionStorage.setItem('users', JSON.stringify(window.users));
+      localStorage.setItem('users', JSON.stringify(window.users));
     } catch (e) {
-      console.warn('Failed to save users to sessionStorage', e);
+      console.warn('Failed to save users to localStorage', e);
     }
     return true;
   },
@@ -78,9 +78,9 @@ window.userStore = {
     this.setCurrentUser(newUsername);
 
     try {
-      sessionStorage.setItem('users', JSON.stringify(window.users));
+      localStorage.setItem('users', JSON.stringify(window.users));
     } catch (e) {
-      console.warn('Failed to save updated users to sessionStorage', e);
+      console.warn('Failed to save updated users to localStorage', e);
     }
 
     return true;
@@ -97,9 +97,9 @@ window.userStore = {
     window.users[user.username].bio = newBio; 
     
     try {
-      sessionStorage.setItem('users', JSON.stringify(window.users));
+      localStorage.setItem('users', JSON.stringify(window.users));
     } catch (e) {
-      console.warn('Failed to save updated users to sessionStorage', e);
+      console.warn('Failed to save updated users to localStorage', e);
     }
 
     return true;
@@ -110,11 +110,11 @@ window.userStore = {
   },
   setCurrentUser: function (username) {
     window.currentUser = this.getUser(username);
-    try {
-          sessionStorage.setItem('currentUser', username);
-      } catch (e) {
-          console.warn('Failed to save current user to sessionStorage', e);
-      }
+  try {
+      localStorage.setItem('currentUser', username);
+    } catch (e) {
+      console.warn('Failed to save current user to localStorage', e);
+    }
       return true;
   },
   getCurrentUser: function () {
@@ -122,7 +122,7 @@ window.userStore = {
   },
   removeCurrentUser: function () {
     window.currentUser = undefined;
-    sessionStorage.removeItem('currentUser');
+    localStorage.removeItem('currentUser');
     return true;
   }
 };
