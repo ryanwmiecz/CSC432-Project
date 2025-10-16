@@ -1,181 +1,44 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import "./App.css"; // we'll move your CSS here
+import { Routes, Route, Link, Navigate } from 'react-router-dom';
+import Login from '../auth/Login';
+import Signup from '../auth/Signup';
+import Profile from './Profile';
+import Chat from './Chat';
+
+function RequireAuth({ children }) {
+  if (!window.userStore || !window.userStore.getCurrentUser()) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+function Dashboard() {
+  // Reuse the original dashboard UI (kept minimal here by delegating to Chat component)
+  return <Chat />;
+}
 
 export default function App() {
-  // If there's no current user, send the browser to the standalone login page.
-  useEffect(() => {
-    try {
-      if (!window.userStore || !window.userStore.getCurrentUser()) {
-        // Use top-level navigation to go to the non-React login page used in the project.
-        window.location.href = '/login.html';
-      }
-    } catch (e) {
-      // If anything goes wrong, don't block rendering — fail open.
-      console.warn('Error checking auth state', e);
-    }
-  }, []);
-  const IN_DISCUSSION = 1;
-  const motionStatusNames = ["Invalid Status", "In Discussion...", "Concluding..."];
-
-  const [myData] = useState({ displayName: "Davy Jones", id: 2 });
-
-  const [data] = useState({
-    users: [
-      { name: "Bob", rank: "Chair", hasStar: true, id: 1 },
-      { name: "Davy Jones", rank: "Member", hasStar: false, id: 2 },
-      { name: "Cheeseman", rank: "Observer", hasStar: false, id: 3 },
-    ],
-    committees: [
-      { title: "Free Pony Committee", id: 1 },
-      { title: "Committee B", id: 2 },
-      { title: "Committee Monitoring Committee", id: 3 },
-    ],
-    motion: {
-      title: "Free Pony",
-      desc: "Free ponies for all!",
-      status: IN_DISCUSSION,
-    },
-  });
-
-  
-  let chatHistory = window.localStorage.getItem("msgHistory");
-  if (chatHistory == null) {
-    [chatHistory] = useState([
-      { time: "10:07am", id: 1, msg: "Sup team" },
-      { time: "10:10am", id: 2, msg: "Salutations..." },
-      { time: "12:32pm", id: 3, msg: "Ruh roh rhaggy!" },
-    ]);
-  } else {
-    [chatHistory] = useState(JSON.parse(chatHistory));
-  }
-
-  let inputString = window.localStorage.getItem("inputString");
-  window.localStorage.setItem("inputString", " ");
-  if (inputString == null) {inputString = "";}
-  const [messageInput, setMessageInput] = useState(inputString);
-  const [messages, setMessages] = useState(chatHistory);
-
-  setTimeout(() => {
-    try {
-      window.localStorage.setItem("inputString", document.getElementById("messageToSend").value);
-    } catch(e) {
-    }
-  }, 100);
-
-  const sendMessage = () => {
-    if (!messageInput.trim()) return;
-    const newMsg = {
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      id: myData.id,
-      msg: messageInput,
-    };
-    setMessages([...messages, newMsg]);
-    setMessageInput("");
-    window.localStorage.setItem("msgHistory", JSON.stringify([...messages, newMsg]));
+  const root = () => {
+    if (window.userStore && window.userStore.getCurrentUser()) return <Navigate to="/profile" replace />;
+    return <Login />;
   };
 
   return (
-    <div className="dashboard">
-      <header>
-        <h1>Committee Dashboard</h1>
-        <div className="user-profile">
-          <img src="placeholder-avatar.png" alt="Profile" />
-          <span>{myData.displayName}</span>
-          <span className="status"></span>
-          <button className="logout-btn">Logout</button>
-        </div>
-      </header>
+    <div>
+      <nav style={{ padding: 8, borderBottom: '1px solid #ddd' }}>
+        <Link to="/login" style={{ marginRight: 8 }}>Login</Link>
+        <Link to="/signup" style={{ marginRight: 8 }}>Sign up</Link>
+        <Link to="/profile">Profile</Link>
+      </nav>
 
-      <main>
-        {/* Sidebar */}
-        <aside className="sidebar">
-          <h2>Online Users</h2>
-          <ul className="online-users">
-            {data.users.map((user) => (
-              <li key={user.id}>
-                <div className="avatar"></div>
-                <span>
-                  {user.name} ({user.rank})
-                </span>
-                <span className="status"></span>
-                {user.hasStar && <span className="leader-symbol">★</span>}
-              </li>
-            ))}
-          </ul>
-
-          <div className="committees">
-            <h2>Committees</h2>
-            <ul>
-              {data.committees.map((com) => (
-                <li key={com.id}>{com.title}</li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-
-        {/* Chat Section */}
-        <section className="chat-section">
-          <div className="chat-header">Chat Window - Current Committee</div>
-          <div className="chat-messages">
-            {messages.map((m, index) => {
-              const isMine = m.id === myData.id;
-              const sender = data.users.find((u) => u.id === m.id)?.name || "Unknown";
-              return (
-                <div key={index} className={`message ${isMine ? "sent" : "received"}`}>
-                  <div className="sender">{isMine ? "You" : sender}</div>
-                  {m.msg}
-                  <span className="timestamp">{m.time}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="chat-input">
-            <input
-              id = "messageToSend"
-              type="text"
-              placeholder="Type your message..."
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            />
-            <button onClick={sendMessage}>Send</button>
-            <button>Emoji</button>
-            <button>Upload</button>
-          </div>
-        </section>
-
-        {/* Motions Section */}
-        <aside className="motions-section">
-          <h2>Motions & Polls</h2>
-          <div className="motion">
-            <h3>{data.motion.title}</h3>
-            <p>{data.motion.desc}</p>
-            <div className="status">
-              Status: {motionStatusNames[data.motion.status]}
-            </div>
-          </div>
-
-          <div className="poll-interface">
-            <button>Vote Yes</button>
-            <button>Vote No</button>
-            <button>Abstain</button>
-            <button>Raise Hand (Pro)</button>
-            <button>Raise Hand (Con)</button>
-          </div>
-
-          <div className="control-panel">
-            <h3>Chair Controls</h3>
-            <label>
-              <input type="checkbox" /> Enable Slow Mode
-            </label>
-            <label>
-              <input type="checkbox" /> Anonymous Voting
-            </label>
-            <button>Start Vote</button>
-            <button>Record Decision</button>
-          </div>
-        </aside>
-      </main>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+        <Route path="/chat" element={<RequireAuth><Chat /></RequireAuth>} />
+        <Route path="/" element={root()} />
+      </Routes>
     </div>
   );
 }

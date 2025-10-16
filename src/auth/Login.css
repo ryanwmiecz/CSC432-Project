@@ -1,0 +1,4 @@
+.loginWindow{padding:20px}
+.usernameInput,.passwordInput{display:block;padding:8px;margin:6px 0;width:240px}
+.warning{color:red;margin-top:6px}
+.buttonRow{margin-top:8px}
