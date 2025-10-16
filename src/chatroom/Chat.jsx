@@ -1,48 +1,169 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import "./App.css"; // we'll move your CSS here
 
 export default function Chat() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const navigate = useNavigate();
+  const IN_DISCUSSION = 1;
+  const motionStatusNames = ["Invalid Status", "In Discussion...", "Concluding..."];
 
-  useEffect(() => {
-    if (!window.userStore || !window.userStore.getCurrentUser()) {
-      navigate('/login');
-      return;
-    }
-    const stored = window.localStorage.getItem('msgHistory');
-    setMessages(stored ? JSON.parse(stored) : [
-      { time: '10:07am', id: 'Bob', msg: 'Sup team' },
-      { time: '10:10am', id: 'Davy Jones', msg: 'Salutations...' },
+  const [myData] = useState({ displayName: "Davy Jones", id: 2 });
+
+  const [data] = useState({
+    users: [
+      { name: "Bob", rank: "Chair", hasStar: true, id: 1 },
+      { name: "Davy Jones", rank: "Member", hasStar: false, id: 2 },
+      { name: "Cheeseman", rank: "Observer", hasStar: false, id: 3 },
+    ],
+    committees: [
+      { title: "Free Pony Committee", id: 1 },
+      { title: "Committee B", id: 2 },
+      { title: "Committee Monitoring Committee", id: 3 },
+    ],
+    motion: {
+      title: "Free Pony",
+      desc: "Free ponies for all!",
+      status: IN_DISCUSSION,
+    },
+  });
+
+  
+  let chatHistory = window.localStorage.getItem("msgHistory");
+  if (chatHistory == null) {
+    [chatHistory] = useState([
+      { time: "10:07am", id: 1, msg: "Sup team" },
+      { time: "10:10am", id: 2, msg: "Salutations..." },
+      { time: "12:32pm", id: 3, msg: "Ruh roh rhaggy!" },
     ]);
-  }, []);
+  } else {
+    [chatHistory] = useState(JSON.parse(chatHistory));
+  }
 
-  const send = () => {
-    if (!input.trim()) return;
-    const user = window.userStore.getCurrentUser();
-    const next = [...messages, { id: user.username, msg: input, time: new Date().toLocaleTimeString() }];
-    setMessages(next);
-    setInput('');
-    window.localStorage.setItem('msgHistory', JSON.stringify(next));
+  let inputString = window.localStorage.getItem("inputString");
+  window.localStorage.setItem("inputString", " ");
+  if (inputString == null) {inputString = "";}
+  const [messageInput, setMessageInput] = useState(inputString);
+  const [messages, setMessages] = useState(chatHistory);
+
+  setTimeout(() => {
+    try {
+      window.localStorage.setItem("inputString", document.getElementById("messageToSend").value);
+    } catch(e) {
+    }
+  }, 100);
+
+  const sendMessage = () => {
+    if (!messageInput.trim()) return;
+    const newMsg = {
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      id: myData.id,
+      msg: messageInput,
+    };
+    setMessages([...messages, newMsg]);
+    setMessageInput("");
+    window.localStorage.setItem("msgHistory", JSON.stringify([...messages, newMsg]));
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Chat</h2>
-      <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid #ccc', padding: 8 }}>
-        {messages.map((m, i) => (
-          <div key={i}><strong>{m.id}:</strong> {m.msg} <small>({m.time})</small></div>
-        ))}
-      </div>
-      <div style={{ marginTop: 8 }}>
-        <input value={input} onChange={e=>setInput(e.target.value)} />
-        <button onClick={send}>Send</button>
-        <button onClick={()=>navigate('/profile')} style={{ marginLeft: 8 }}>Profile</button>
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <button onClick={() => { window.userStore.removeCurrentUser(); navigate('/login'); }}>Logout</button>
-      </div>
+    <div className="dashboard">
+      <header>
+        <h1>Committee Dashboard</h1>
+        <div className="user-profile">
+          <img src="placeholder-avatar.png" alt="Profile" />
+          <span>{myData.displayName}</span>
+          <span className="status"></span>
+          <button className="logout-btn">Logout</button>
+        </div>
+      </header>
+
+      <main>
+        {/* Sidebar */}
+        <aside className="sidebar">
+          <h2>Online Users</h2>
+          <ul className="online-users">
+            {data.users.map((user) => (
+              <li key={user.id}>
+                <div className="avatar"></div>
+                <span>
+                  {user.name} ({user.rank})
+                </span>
+                <span className="status"></span>
+                {user.hasStar && <span className="leader-symbol">★</span>}
+              </li>
+            ))}
+          </ul>
+
+          <div className="committees">
+            <h2>Committees</h2>
+            <ul>
+              {data.committees.map((com) => (
+                <li key={com.id}>{com.title}</li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+
+        {/* Chat Section */}
+        <section className="chat-section">
+          <div className="chat-header">Chat Window - Current Committee</div>
+          <div className="chat-messages">
+            {messages.map((m, index) => {
+              const isMine = m.id === myData.id;
+              const sender = data.users.find((u) => u.id === m.id)?.name || "Unknown";
+              return (
+                <div key={index} className={`message ${isMine ? "sent" : "received"}`}>
+                  <div className="sender">{isMine ? "You" : sender}</div>
+                  {m.msg}
+                  <span className="timestamp">{m.time}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="chat-input">
+            <input
+              id = "messageToSend"
+              type="text"
+              placeholder="Type your message..."
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            />
+            <button onClick={sendMessage}>Send</button>
+            <button>Emoji</button>
+            <button>Upload</button>
+          </div>
+        </section>
+
+        {/* Motions Section */}
+        <aside className="motions-section">
+          <h2>Motions & Polls</h2>
+          <div className="motion">
+            <h3>{data.motion.title}</h3>
+            <p>{data.motion.desc}</p>
+            <div className="status">
+              Status: {motionStatusNames[data.motion.status]}
+            </div>
+          </div>
+
+          <div className="poll-interface">
+            <button>Vote Yes</button>
+            <button>Vote No</button>
+            <button>Abstain</button>
+            <button>Raise Hand (Pro)</button>
+            <button>Raise Hand (Con)</button>
+          </div>
+
+          <div className="control-panel">
+            <h3>Chair Controls</h3>
+            <label>
+              <input type="checkbox" /> Enable Slow Mode
+            </label>
+            <label>
+              <input type="checkbox" /> Anonymous Voting
+            </label>
+            <button>Start Vote</button>
+            <button>Record Decision</button>
+          </div>
+        </aside>
+      </main>
     </div>
   );
 }

@@ -46,7 +46,7 @@ export default function ProfilePage() {
   };
 
   const handleBack = () => {
-    navigate('/');
+    navigate('/Chat');
   };
 
   const handleLogout = () => {
