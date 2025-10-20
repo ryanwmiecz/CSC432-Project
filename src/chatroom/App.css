@@ -224,14 +224,68 @@ main {
     right: 0.8rem;
 }
 
+.message.received .timestamp {
+    right: auto;
+    left: 0.8rem;
+}
+
+/* --- ATTACHMENT STYLES (NEW) --- */
+.attachment-container {
+    padding: 0.5rem;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.message.sent .attachment-container {
+    background-color: #e0723a; /* Slightly darker orange */
+}
+
+.message.received .attachment-container {
+    background-color: #b0b0b0; /* Slightly darker light grey */
+}
+
+.attachment-type {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.image-placeholder {
+    width: 150px;
+    height: 100px;
+    background-color: var(--primary-dark);
+    border: 1px solid var(--accent-orange);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--secondary-light);
+    text-align: center;
+    font-size: 0.7rem;
+    padding: 0.5rem;
+}
+
+.image-caption {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+
 /* --- CHAT INPUT --- */
+.chat-input-container {
+    background-color: var(--secondary-light);
+    flex-shrink: 0;
+    position: relative;
+}
+
 .chat-input {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 1rem;
-    background-color: var(--secondary-light);
-    flex-shrink: 0;
 }
 
 .chat-input input {
@@ -248,6 +302,31 @@ main {
     padding: 0.5rem 1rem;
     cursor: pointer;
     border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* --- MOCK EMOJI PICKER (NEW) --- */
+.emoji-picker-mock {
+    position: absolute;
+    bottom: 100%; /* Position it above the input */
+    right: 1rem;
+    background-color: var(--white);
+    padding: 0.5rem;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    gap: 0.5rem;
+    z-index: 10;
+}
+
+.emoji-picker-mock span {
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.emoji-picker-mock span:hover {
+    transform: scale(1.1);
 }
 
 /* --- MOTIONS SECTION --- */
