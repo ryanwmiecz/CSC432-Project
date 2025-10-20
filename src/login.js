@@ -24,7 +24,8 @@ loginButton.addEventListener('click', function () {
     if (user && user.password === password) {
         // Authentication successful. Store in-memory for this session.
         window.userStore.setCurrentUser(username);
-        window.location.href = 'profile.html';
+        // Navigate to the React profile route
+        window.location.href = '/profile';
         return;
     }
 
@@ -32,7 +33,8 @@ loginButton.addEventListener('click', function () {
 });
 
 signupButton.addEventListener('click', function () {
-    window.location.href = 'signup.html';
+    // Navigate to the React signup route
+    window.location.href = '/signup';
 });
 
 

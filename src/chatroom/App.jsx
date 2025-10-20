@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from 'react-router-dom';
 import "./App.css";
 
 // Helper component for displaying messages, including images
@@ -30,16 +31,17 @@ const ChatMessage = ({ m, myData, data }) => {
 
 
 export default function App() {
-  // If there's no current user, send the browser to the standalone login page.
+  // If there's no current user, navigate to the React login route.
+  const navigate = useNavigate();
   useEffect(() => {
     try {
       if (!window.userStore || !window.userStore.getCurrentUser()) {
-        window.location.href = '/login.html';
+        navigate('/login');
       }
     } catch (e) {
       console.warn('Error checking auth state', e);
     }
-  }, []);
+  }, [navigate]);
 
   const STATUS_INVALID = 0;
   const STATUS_DISCUSSION = 1;
@@ -361,7 +363,7 @@ export default function App() {
           <span>{myData.displayName}</span>
           <span className="status">{data.users.find((u) => u.id === myData.id)?.online ? "Online" : "Offline"}</span>
           <button onClick={changeDisplayName}>Change Name</button>
-          <button className="logout-btn">Logout</button>
+          <button className="logout-btn" onClick={() => { window.userStore && window.userStore.removeCurrentUser(); navigate('/login'); }}>Logout</button>
         </div>
       </header>
       <main>
