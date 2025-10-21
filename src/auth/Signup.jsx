@@ -22,21 +22,24 @@ export default function Signup() {
   };
 
   return (
-    <div className="loginWindow">
-      <h1>Sign Up</h1>
-      <div className="username">
-        <input type="text" className="usernameInput" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} />
-      </div>
-      <div className="password">
-        <input type="password" className="passwordInput" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
-      </div>
-      <div className="password">
-        <input type="password" className="passwordInput" placeholder="Password" value={passwordRe} onChange={e=>setPasswordRe(e.target.value)} />
-      </div>
-      <div className="warning" id="signupWarning">{warning}</div>
-      <div style={{ marginTop: 8 }}>
+    <main id="main">
+      <div className="loginWindow">
+        <h1>Sign Up</h1>
+        <h2>Create a username</h2>
+        <div className="username">
+          <input type="text" className="usernameInput" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} />
+        </div>
+        <h2>Create a password</h2>
+        <div className="password">
+          <input type="password" className="passwordInput" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
+        </div>
+        <h2>Input the password again</h2>
+        <div className="password">
+          <input type="password" className="passwordInput" placeholder="Password" value={passwordRe} onChange={e=>setPasswordRe(e.target.value)} />
+        </div>
+        <div className="warning" id="signupWarning">{warning}</div>
         <button className="signupButton" onClick={handle}>Sign Up</button>
       </div>
-    </div>
+    </main>
   );
 }

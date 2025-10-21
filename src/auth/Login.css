@@ -1,4 +1,82 @@
-.loginWindow{padding:20px}
-.usernameInput,.passwordInput{display:block;padding:8px;margin:6px 0;width:240px}
-.warning{color:red;margin-top:6px}
-.buttonRow{margin-top:8px}
+#main{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    display: flex;
+    flex-direction: row;
+    background-color: #4F5D75;
+    height: 100vh;
+    width: 100vw;
+    border-style: solid;
+    border-width: 30px;
+    border-color: #EF8354;
+    box-sizing: border-box;
+}
+
+.loginWindow{
+    display: flex;
+    flex-direction: column;
+    height: 50%;
+    width: 30%;
+    border-radius: 30px;
+    align-items: center;
+    justify-content: center;
+    background-color: #2D3142;
+}
+
+.username{
+    height: 10%;
+    width: 75%;
+}
+
+.usernameInput{
+    height: 100%;
+    width: 100%;
+}
+
+.password{
+    margin-top: 10px;
+    height: 10%;
+    width: 75%;
+}
+
+.passwordInput{
+    height: 100%;
+    width: 100%;
+}
+
+.buttonContainer{
+    display: flex;
+    height: 50%;
+    width: 90%;
+    align-items: center;
+    justify-content: center;
+    
+}
+
+.loginButton{
+    height: 10%;
+    width: 60%;
+    margin-top: 10px;
+    background-color: #BFC0C0;
+}
+
+.signupButton{
+    height: 10%;
+    width: 60%;
+    margin-top: 10px;
+    background-color: #BFC0C0;
+}
+.warning{
+    font-size: 15px;
+    color: red;
+    margin-top: 10px;;
+}
+
+h1{
+    color: #EF8354
+}

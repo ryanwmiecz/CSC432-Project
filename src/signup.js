@@ -37,6 +37,6 @@ signupButton.addEventListener('click', function () {
         return;
     }
 
-    // Redirect to login after successful signup.
-    window.location.href = 'login.html';
+    // Redirect to the React login route after successful signup.
+    window.location.href = '/login';
 });

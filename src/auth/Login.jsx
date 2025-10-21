@@ -25,19 +25,19 @@ export default function Login() {
   };
 
   return (
-    <div className="loginWindow">
-      <h1>Login</h1>
-      <div className="username">
-        <input type="text" className="usernameInput" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} />
-      </div>
-      <div className="password">
-        <input type="password" className="passwordInput" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
-      </div>
-      <div className="warning" id="warning">{warning}</div>
-      <div className="buttonRow">
+    <main id="main">
+      <div className="loginWindow">
+        <h1>Login</h1>
+        <div className="username">
+          <input type="text" className="usernameInput" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} />
+        </div>
+        <div className="password">
+          <input type="password" className="passwordInput" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} />
+        </div>
+        <div className="warning" id="warning">{warning}</div>
         <button className="loginButton" onClick={handleLogin}>Log In</button>
         <button className="signupButton" onClick={() => navigate('/signup')}>Sign Up</button>
       </div>
-    </div>
+    </main>
   );
 }
