@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import "./App.css";
 
 // Helper component for displaying messages, including images
@@ -33,15 +34,43 @@ const ChatMessage = ({ m, myData, data }) => {
 export default function App() {
   // If there's no current user, navigate to the React login route.
   const navigate = useNavigate();
+  
+  // Try to use Auth0 if available
+  let auth0Available = false;
+  let isAuthenticated = false;
+  let isLoading = false;
+  let user = null;
+  let logout = null;
+  
+  try {
+    const auth0 = useAuth0();
+    auth0Available = true;
+    isAuthenticated = auth0.isAuthenticated;
+    isLoading = auth0.isLoading;
+    user = auth0.user;
+    logout = auth0.logout;
+  } catch (e) {
+    // Auth0 not configured, use fallback
+    auth0Available = false;
+  }
+
   useEffect(() => {
-    try {
-      if (!window.userStore || !window.userStore.getCurrentUser()) {
+    if (auth0Available) {
+      // Using Auth0
+      if (!isLoading && !isAuthenticated) {
         navigate('/login');
       }
-    } catch (e) {
-      console.warn('Error checking auth state', e);
+    } else {
+      // Using local userStore
+      try {
+        if (!window.userStore || !window.userStore.getCurrentUser()) {
+          navigate('/login');
+        }
+      } catch (e) {
+        console.warn('Error checking auth state', e);
+      }
     }
-  }, [navigate]);
+  }, [navigate, auth0Available, isAuthenticated, isLoading]);
 
   const STATUS_INVALID = 0;
   const STATUS_DISCUSSION = 1;
@@ -352,7 +381,26 @@ export default function App() {
 
   // --- End of New Handlers ---
 
+  const handleLogout = () => {
+    if (auth0Available && logout) {
+      // Auth0 logout
+      logout({ 
+        logoutParams: { 
+          returnTo: window.location.origin + '/login' 
+        } 
+      });
+    } else {
+      // Local userStore logout
+      window.userStore && window.userStore.removeCurrentUser();
+      navigate('/login');
+    }
+  };
+
   const availableUsers = data.users.filter((u) => !currentCommittee.memberIds.includes(u.id));
+
+  if (auth0Available && isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="dashboard">
@@ -360,10 +408,10 @@ export default function App() {
         <h1>Committee Dashboard</h1>
         <div className="user-profile">
           <img src="placeholder-avatar.png" alt="Profile" />
-          <span>{myData.displayName}</span>
+          <span>{auth0Available && user ? user.name : myData.displayName}</span>
           <span className="status">{data.users.find((u) => u.id === myData.id)?.online ? "Online" : "Offline"}</span>
-          <button onClick={changeDisplayName}>Change Name</button>
-          <button className="logout-btn" onClick={() => { window.userStore && window.userStore.removeCurrentUser(); navigate('/login'); }}>Logout</button>
+          <button onClick={() => navigate('/profile')}>Change Name</button>
+          <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>
       <main>

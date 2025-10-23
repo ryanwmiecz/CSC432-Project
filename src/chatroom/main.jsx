@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Auth0Provider } from '@auth0/auth0-react';
 // Make sure the global userStore (window.userStore) is initialized before App mounts
 import "../users.js";
 import "../auth/userStore.js";
@@ -10,7 +11,10 @@ import Signup from "../auth/Signup";
 import Profile from "./Profile";
 import "./App.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+// Check if Auth0 credentials are available
+const hasAuth0Credentials = import.meta.env.VITE_AUTH0_DOMAIN && import.meta.env.VITE_AUTH0_CLIENT_ID;
+
+const AppContent = (
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
@@ -21,4 +25,20 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
+);
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  hasAuth0Credentials ? (
+    <Auth0Provider
+      domain={import.meta.env.VITE_AUTH0_DOMAIN}
+      clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
+      authorizationParams={{
+        redirect_uri: window.location.origin
+      }}
+    >
+      {AppContent}
+    </Auth0Provider>
+  ) : (
+    AppContent
+  )
 );
