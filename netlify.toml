@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Auth0 Client IDs are public and safe to expose in client-side code
+# This is not a secret despite what the scanner may think
