@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Environment variables are set in Netlify UI:
+# Site Settings → Environment Variables → Add a variable
+# Make sure to add:
+# - VITE_AUTH0_DOMAIN
+# - VITE_AUTH0_CLIENT_ID
