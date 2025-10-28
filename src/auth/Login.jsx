@@ -28,7 +28,17 @@ export default function Login() {
 
   // If user is authenticated, redirect to profile
   useEffect(() => {
+    // Check if user already has an auth token
+    const auth0Token = localStorage.getItem('auth0_token');
+    
+    if (auth0Token) {
+      // Already logged in via custom form
+      navigate('/profile');
+      return;
+    }
+    
     if (auth0Available && isAuthenticated) {
+      // Already logged in via Auth0 SDK
       navigate('/profile');
     }
   }, [isAuthenticated, navigate, auth0Available]);

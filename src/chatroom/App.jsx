@@ -56,7 +56,15 @@ export default function App() {
 
   useEffect(() => {
     if (auth0Available) {
-      // Using Auth0
+      // Check if user logged in via our custom form (has token in localStorage)
+      const auth0Token = localStorage.getItem('auth0_token');
+      
+      if (auth0Token) {
+        // User logged in via custom form, allow access
+        return;
+      }
+      
+      // Otherwise check Auth0 SDK authentication
       if (!isLoading && !isAuthenticated) {
         navigate('/login');
       }
@@ -382,8 +390,12 @@ export default function App() {
   // --- End of New Handlers ---
 
   const handleLogout = () => {
-    if (auth0Available && logout) {
-      // Auth0 logout
+    // Clear Auth0 tokens from localStorage
+    localStorage.removeItem('auth0_token');
+    localStorage.removeItem('auth0_user');
+    
+    if (auth0Available && logout && isAuthenticated) {
+      // Auth0 SDK logout
       logout({ 
         logoutParams: { 
           returnTo: window.location.origin + '/login' 

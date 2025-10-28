@@ -29,13 +29,35 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
+    console.log('[Profile] Checking auth...', {
+      auth0Available,
+      isAuthenticated,
+      isLoading,
+      hasToken: !!localStorage.getItem('auth0_token'),
+      hasUser: !!localStorage.getItem('auth0_user')
+    });
+    
     if (auth0Available) {
-      // Using Auth0
-      if (!isLoading && !isAuthenticated) {
+      // Check if user logged in via our custom form (has token in localStorage)
+      const auth0Token = localStorage.getItem('auth0_token');
+      const auth0Username = localStorage.getItem('auth0_user');
+      
+      if (auth0Token && auth0Username) {
+        // User logged in via custom form
+        console.log('[Profile] Using token-based auth');
+        setUser({
+          username: auth0Username,
+          bio: `${auth0Username}@local.app`,
+          img: 'public/vite.svg'
+        });
+      } else if (!isLoading && !isAuthenticated) {
+        // No token and not authenticated via SDK
+        console.log('[Profile] No auth, redirecting to login');
         navigate('/login');
         return;
-      }
-      if (auth0User) {
+      } else if (auth0User) {
+        // Authenticated via Auth0 SDK
+        console.log('[Profile] Using SDK auth');
         setUser({
           username: auth0User.name || auth0User.email,
           bio: auth0User.email,
@@ -94,14 +116,23 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
-    if (auth0Available && logout) {
+    // Clear Auth0 tokens from localStorage
+    localStorage.removeItem('auth0_token');
+    localStorage.removeItem('auth0_user');
+    
+    if (auth0Available && logout && isAuthenticated) {
+      // If using Auth0 SDK authentication
       logout({ 
         logoutParams: { 
           returnTo: window.location.origin + '/login' 
         } 
       });
-    } else {
+    } else if (window.userStore) {
+      // If using local userStore
       window.userStore.removeCurrentUser();
+      navigate('/login');
+    } else {
+      // Just navigate to login
       navigate('/login');
     }
   };
