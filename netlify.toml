@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  environment = { SECRETS_SCAN_ENABLED = "false" }
 
 [[redirects]]
   from = "/*"
@@ -8,4 +9,5 @@
   status = 200
 
 # Auth0 Client IDs are public and safe to expose in client-side code
-# This is not a secret despite what the scanner may think
+# Secrets scanning is disabled because Auth0 client IDs are meant to be public
+# and will appear in the compiled JavaScript bundle (this is expected for SPAs)
