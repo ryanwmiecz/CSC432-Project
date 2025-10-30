@@ -14,6 +14,7 @@ export const useMessages = (chatroomId = null, maxMessages = 100) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    console.log('useMessages: Subscribing to chatroom:', chatroomId);
     setLoading(true);
     setError(null);
 
@@ -21,6 +22,7 @@ export const useMessages = (chatroomId = null, maxMessages = 100) => {
     const unsubscribe = subscribeToMessages(
       chatroomId,
       (newMessages) => {
+        console.log('useMessages: Received messages:', newMessages.length, 'messages for chatroom:', chatroomId);
         setMessages(newMessages);
         setLoading(false);
       },
@@ -29,6 +31,7 @@ export const useMessages = (chatroomId = null, maxMessages = 100) => {
 
     // Cleanup subscription on unmount
     return () => {
+      console.log('useMessages: Unsubscribing from chatroom:', chatroomId);
       if (unsubscribe) {
         unsubscribe();
       }

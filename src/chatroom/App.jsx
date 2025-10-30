@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import "./App.css";
 
+// Import Firestore services
+import { useMessages } from '../firebase/hooks';
+import { createMessage, deleteMessage, formatTimestamp } from '../firebase/firestoreService';
+
 // Helper component for displaying messages, including images
-const ChatMessage = ({ m, myData, data }) => {
-  const isMine = m.id === myData.id;
-  const sender = data.users.find((u) => u.id === m.id)?.name || "Unknown";
+const ChatMessage = ({ m, myData, data, onDelete }) => {
+  const isMine = m.userId === myData.id || m.id === myData.id;
+  const sender = data.users.find((u) => u.id === m.id || u.id === m.userId)?.name || m.userName || "Unknown";
 
   return (
     <div className={`message ${isMine ? "sent" : "received"}`}>
@@ -15,17 +19,26 @@ const ChatMessage = ({ m, myData, data }) => {
         <div className="message-content attachment-container">
           <p className="attachment-type">🖼️ Image Attachment</p>
           <div className="image-placeholder">
-            {/* In a real app, this would be an <img> tag with the loaded source. */}
-            {/* Since we are using local storage without real file uploads: */}
-            <p>Image not loaded (Local Storage Mock)</p>
-            <p style={{fontSize: '0.8rem', color: 'var(--secondary-light)'}}>{m.attachment.width}x{m.attachment.height}</p>
+            {m.attachment.url ? (
+              <img src={m.attachment.url} alt="attachment" style={{ maxWidth: '300px' }} />
+            ) : (
+              <>
+                <p>Image not loaded (Local Storage Mock)</p>
+                <p style={{fontSize: '0.8rem', color: 'var(--secondary-light)'}}>{m.attachment.width}x{m.attachment.height}</p>
+              </>
+            )}
           </div>
-          {m.msg && <p className="image-caption">{m.msg}</p>}
+          {(m.msg || m.text) && <p className="image-caption">{m.msg || m.text}</p>}
         </div>
       ) : (
-        <div className="message-content">{m.msg}</div>
+        <div className="message-content">{m.msg || m.text}</div>
       )}
-      <span className="timestamp">{m.time}</span>
+      <span className="timestamp">
+        {m.createdAt ? formatTimestamp(m.createdAt) : m.time}
+      </span>
+      {isMine && onDelete && (
+        <button className="delete-msg-btn" onClick={() => onDelete(m.id)}>×</button>
+      )}
     </div>
   );
 };
@@ -132,6 +145,9 @@ export default function App() {
   const [anonymousVoting, setAnonymousVoting] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false); // New state for emoji picker
 
+  // Firestore messages hook - Get real-time messages for current committee
+  const { messages: firestoreMessages, loading: messagesLoading } = useMessages(currentCommitteeId.toString(), 100);
+
   const currentCommittee = data.committees.find((c) => c.id === currentCommitteeId) || { memberIds: [], motions: [], messages: [] };
   const currentUsers = currentCommittee.memberIds.map((id) => data.users.find((u) => u.id === id)).filter(Boolean);
   const onlineUsers = currentUsers.filter((u) => u.online);
@@ -153,7 +169,7 @@ export default function App() {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
-  }, [currentCommittee.messages.length]);
+  }, [firestoreMessages.length]);
 
   // Handle own online status based on tab visibility
   useEffect(() => {
@@ -184,21 +200,44 @@ export default function App() {
     });
   };
 
-  const sendMessage = (attachment = null) => {
+  const sendMessage = async (attachment = null) => {
     // Only allow sending a message if it has text OR an attachment
     if (!messageInput.trim() && !attachment) return;
     
-    const newMsg = {
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      id: myData.id,
-      msg: messageInput,
-      ...(attachment && { attachment }), // Add attachment if provided
-    };
-    updateData((nd) => {
-      const com = nd.committees.find((c) => c.id === currentCommitteeId);
-      if (com) com.messages.push(newMsg);
-    });
-    setMessageInput("");
+    try {
+      console.log('Sending message to Firestore:', {
+        userId: myData.id,
+        userName: myData.displayName,
+        text: messageInput,
+        chatroomId: currentCommitteeId.toString(),
+      });
+      
+      // Send message to Firestore
+      const messageId = await createMessage({
+        userId: myData.id,
+        userName: myData.displayName,
+        text: messageInput,
+        chatroomId: currentCommitteeId.toString(),
+        attachment: attachment || null,
+      });
+      
+      console.log('Message sent successfully with ID:', messageId);
+      setMessageInput("");
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm('Delete this message?')) return;
+    
+    try {
+      await deleteMessage(messageId);
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      alert('Failed to delete message.');
+    }
   };
 
   const createCommittee = () => {
@@ -480,9 +519,13 @@ export default function App() {
         <section className="chat-section">
           <div className="chat-header">Chat Window - {currentCommittee.title}</div>
           <div className="chat-messages" ref={chatRef}>
-            {currentCommittee.messages.map((m, index) => (
-              <ChatMessage key={index} m={m} myData={myData} data={data} />
-            ))}
+            {messagesLoading ? (
+              <div className="loading-messages">Loading messages...</div>
+            ) : (
+              firestoreMessages.map((m) => (
+                <ChatMessage key={m.id} m={m} myData={myData} data={data} onDelete={handleDeleteMessage} />
+              ))
+            )}
           </div>
           <div className="chat-input-container">
             {/* Mock Emoji Picker UI */}
