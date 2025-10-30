@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import '../../src/profile.css';
 
 export default function ProfilePage() {
@@ -8,14 +9,71 @@ export default function ProfilePage() {
   const [changeNameVal, setChangeNameVal] = useState('');
   const [changeBioVal, setChangeBioVal] = useState('');
 
+  // Try to use Auth0 if available
+  let auth0Available = false;
+  let isAuthenticated = false;
+  let isLoading = false;
+  let auth0User = null;
+  let logout = null;
+  
+  try {
+    const auth0 = useAuth0();
+    auth0Available = true;
+    isAuthenticated = auth0.isAuthenticated;
+    isLoading = auth0.isLoading;
+    auth0User = auth0.user;
+    logout = auth0.logout;
+  } catch (e) {
+    // Auth0 not configured, use fallback
+    auth0Available = false;
+  }
+
   useEffect(() => {
-    if (!window.userStore || !window.userStore.getCurrentUser()) {
-      navigate('/login');
-      return;
+    console.log('[Profile] Checking auth...', {
+      auth0Available,
+      isAuthenticated,
+      isLoading,
+      hasToken: !!localStorage.getItem('auth0_token'),
+      hasUser: !!localStorage.getItem('auth0_user')
+    });
+    
+    if (auth0Available) {
+      // Check if user logged in via our custom form (has token in localStorage)
+      const auth0Token = localStorage.getItem('auth0_token');
+      const auth0Username = localStorage.getItem('auth0_user');
+      
+      if (auth0Token && auth0Username) {
+        // User logged in via custom form
+        console.log('[Profile] Using token-based auth');
+        setUser({
+          username: auth0Username,
+          bio: `${auth0Username}@local.app`,
+          img: 'public/vite.svg'
+        });
+      } else if (!isLoading && !isAuthenticated) {
+        // No token and not authenticated via SDK
+        console.log('[Profile] No auth, redirecting to login');
+        navigate('/login');
+        return;
+      } else if (auth0User) {
+        // Authenticated via Auth0 SDK
+        console.log('[Profile] Using SDK auth');
+        setUser({
+          username: auth0User.name || auth0User.email,
+          bio: auth0User.email,
+          img: auth0User.picture || 'public/vite.svg'
+        });
+      }
+    } else {
+      // Using local userStore
+      if (!window.userStore || !window.userStore.getCurrentUser()) {
+        navigate('/login');
+        return;
+      }
+      const u = window.userStore.getCurrentUser();
+      setUser(u);
     }
-    const u = window.userStore.getCurrentUser();
-    setUser(u);
-  }, []);
+  }, [navigate, auth0Available, isAuthenticated, isLoading, auth0User]);
 
   useEffect(() => {
     if (user) {
@@ -26,6 +84,10 @@ export default function ProfilePage() {
   }, [user]);
 
   const handleChangeName = () => {
+    if (auth0Available) {
+      alert('Name changes for Auth0 users must be done through your Auth0 profile.');
+      return;
+    }
     const newName = changeNameVal.trim();
     if (!newName || !user) return;
     const oldUsername = user.username;
@@ -39,6 +101,10 @@ export default function ProfilePage() {
   };
 
   const handleChangeBio = () => {
+    if (auth0Available) {
+      alert('Bio changes for Auth0 users are not supported.');
+      return;
+    }
     const newBio = changeBioVal.trim();
     if (!newBio || !user) return;
     window.userStore.changeBio(newBio);
@@ -50,9 +116,30 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
-    window.userStore.removeCurrentUser();
-    navigate('/login');
+    // Clear Auth0 tokens from localStorage
+    localStorage.removeItem('auth0_token');
+    localStorage.removeItem('auth0_user');
+    
+    if (auth0Available && logout && isAuthenticated) {
+      // If using Auth0 SDK authentication
+      logout({ 
+        logoutParams: { 
+          returnTo: window.location.origin + '/login' 
+        } 
+      });
+    } else if (window.userStore) {
+      // If using local userStore
+      window.userStore.removeCurrentUser();
+      navigate('/login');
+    } else {
+      // Just navigate to login
+      navigate('/login');
+    }
   };
+
+  if (auth0Available && isLoading) {
+    return <div>Loading...</div>;
+  }
 
   if (!user) return <div>Loading...</div>;
 

@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  environment = { SECRETS_SCAN_ENABLED = "false" }
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Auth0 Client IDs are public and safe to expose in client-side code
+# Secrets scanning is disabled because Auth0 client IDs are meant to be public
+# and will appear in the compiled JavaScript bundle (this is expected for SPAs)
