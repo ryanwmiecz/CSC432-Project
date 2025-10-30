@@ -33,3 +33,6 @@ storybook-static
 *.njsproj
 *.sln
 *.sw?
+
+#specstory
+*.specstory/
