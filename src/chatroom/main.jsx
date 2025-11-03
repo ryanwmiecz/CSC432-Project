@@ -27,14 +27,18 @@ const AppContent = (
   </React.StrictMode>
 );
 
+// Build authorization params for Auth0Provider. Include audience when available
+const auth0AuthParams = { redirect_uri: window.location.origin };
+if (import.meta.env.VITE_AUTH0_MGMT_AUDIENCE) {
+  auth0AuthParams.audience = import.meta.env.VITE_AUTH0_MGMT_AUDIENCE;
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   hasAuth0Credentials ? (
     <Auth0Provider
       domain={import.meta.env.VITE_AUTH0_DOMAIN}
       clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
-      authorizationParams={{
-        redirect_uri: window.location.origin
-      }}
+      authorizationParams={auth0AuthParams}
     >
       {AppContent}
     </Auth0Provider>
