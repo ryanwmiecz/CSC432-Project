@@ -1,4 +1,4 @@
-// Firestore service for chatroom CRUD operations
+// Enhanced Firestore service with Motions and Committees support
 import { 
   collection, 
   addDoc, 
@@ -21,14 +21,11 @@ import { db } from './config';
 const MESSAGES_COLLECTION = 'messages';
 const USERS_COLLECTION = 'users';
 const CHATROOMS_COLLECTION = 'chatrooms';
+const COMMITTEES_COLLECTION = 'committees';
+const MOTIONS_COLLECTION = 'motions';
 
 // ============= MESSAGE OPERATIONS =============
 
-/**
- * Create a new message in Firestore
- * @param {Object} messageData - { userId, userName, text, chatroomId, attachment }
- * @returns {Promise<string>} - Document ID of the created message
- */
 export const createMessage = async (messageData) => {
   try {
     const docRef = await addDoc(collection(db, MESSAGES_COLLECTION), {
@@ -43,51 +40,6 @@ export const createMessage = async (messageData) => {
   }
 };
 
-/**
- * Get all messages from a chatroom
- * @param {string} chatroomId - ID of the chatroom
- * @param {number} maxMessages - Maximum number of messages to retrieve
- * @returns {Promise<Array>} - Array of messages
- */
-export const getMessages = async (chatroomId = null, maxMessages = 100) => {
-  try {
-    let q = query(
-      collection(db, MESSAGES_COLLECTION),
-      orderBy('createdAt', 'desc'),
-      limit(maxMessages)
-    );
-
-    if (chatroomId) {
-      q = query(
-        collection(db, MESSAGES_COLLECTION),
-        where('chatroomId', '==', chatroomId),
-        orderBy('createdAt', 'desc'),
-        limit(maxMessages)
-      );
-    }
-
-    const querySnapshot = await getDocs(q);
-    const messages = [];
-    querySnapshot.forEach((doc) => {
-      messages.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    });
-    return messages.reverse(); // Return in chronological order
-  } catch (error) {
-    console.error('Error getting messages:', error);
-    throw error;
-  }
-};
-
-/**
- * Listen to real-time message updates
- * @param {string} chatroomId - ID of the chatroom
- * @param {Function} callback - Callback function to handle new messages
- * @param {number} maxMessages - Maximum number of messages to retrieve
- * @returns {Function} - Unsubscribe function
- */
 export const subscribeToMessages = (chatroomId = null, callback, maxMessages = 100) => {
   let q = query(
     collection(db, MESSAGES_COLLECTION),
@@ -112,34 +64,12 @@ export const subscribeToMessages = (chatroomId = null, callback, maxMessages = 1
         ...doc.data(),
       });
     });
-    callback(messages.reverse()); // Return in chronological order
+    callback(messages.reverse());
   }, (error) => {
     console.error('Error in message subscription:', error);
   });
 };
 
-/**
- * Update a message
- * @param {string} messageId - ID of the message to update
- * @param {Object} updates - Object containing fields to update
- */
-export const updateMessage = async (messageId, updates) => {
-  try {
-    const messageRef = doc(db, MESSAGES_COLLECTION, messageId);
-    await updateDoc(messageRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('Error updating message:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete a message
- * @param {string} messageId - ID of the message to delete
- */
 export const deleteMessage = async (messageId) => {
   try {
     await deleteDoc(doc(db, MESSAGES_COLLECTION, messageId));
@@ -149,57 +79,238 @@ export const deleteMessage = async (messageId) => {
   }
 };
 
+// ============= COMMITTEE OPERATIONS =============
+
+export const createCommittee = async (committeeData) => {
+  try {
+    const docRef = await addDoc(collection(db, COMMITTEES_COLLECTION), {
+      ...committeeData,
+      memberIds: committeeData.memberIds || [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating committee:', error);
+    throw error;
+  }
+};
+
+export const getCommittees = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, COMMITTEES_COLLECTION));
+    const committees = [];
+    querySnapshot.forEach((doc) => {
+      committees.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+    return committees;
+  } catch (error) {
+    console.error('Error getting committees:', error);
+    throw error;
+  }
+};
+
+export const subscribeToCommittees = (callback) => {
+  return onSnapshot(collection(db, COMMITTEES_COLLECTION), (querySnapshot) => {
+    const committees = [];
+    querySnapshot.forEach((doc) => {
+      committees.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+    callback(committees);
+  }, (error) => {
+    console.error('Error in committee subscription:', error);
+  });
+};
+
+export const updateCommittee = async (committeeId, updates) => {
+  try {
+    const committeeRef = doc(db, COMMITTEES_COLLECTION, committeeId);
+    await updateDoc(committeeRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating committee:', error);
+    throw error;
+  }
+};
+
+export const addMemberToCommittee = async (committeeId, userId) => {
+  try {
+    const committeeRef = doc(db, COMMITTEES_COLLECTION, committeeId);
+    const committeeDoc = await getDoc(committeeRef);
+    
+    if (committeeDoc.exists()) {
+      const currentMembers = committeeDoc.data().memberIds || [];
+      if (!currentMembers.includes(userId)) {
+        await updateDoc(committeeRef, {
+          memberIds: [...currentMembers, userId],
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error adding member to committee:', error);
+    throw error;
+  }
+};
+
+// ============= MOTION OPERATIONS =============
+
+export const createMotion = async (motionData) => {
+  try {
+    const docRef = await addDoc(collection(db, MOTIONS_COLLECTION), {
+      ...motionData,
+      replies: motionData.replies || [],
+      votes: motionData.votes || {},
+      recorded: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating motion:', error);
+    throw error;
+  }
+};
+
+export const getMotions = async (committeeId) => {
+  try {
+    const q = query(
+      collection(db, MOTIONS_COLLECTION),
+      where('committeeId', '==', committeeId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const motions = [];
+    querySnapshot.forEach((doc) => {
+      motions.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+    return motions;
+  } catch (error) {
+    console.error('Error getting motions:', error);
+    throw error;
+  }
+};
+
+export const subscribeToMotions = (committeeId, callback) => {
+  const q = query(
+    collection(db, MOTIONS_COLLECTION),
+    where('committeeId', '==', committeeId),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(q, (querySnapshot) => {
+    const motions = [];
+    querySnapshot.forEach((doc) => {
+      motions.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+    });
+    callback(motions);
+  }, (error) => {
+    console.error('Error in motion subscription:', error);
+  });
+};
+
+export const updateMotion = async (motionId, updates) => {
+  try {
+    const motionRef = doc(db, MOTIONS_COLLECTION, motionId);
+    await updateDoc(motionRef, {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating motion:', error);
+    throw error;
+  }
+};
+
+export const addReplyToMotion = async (motionId, reply) => {
+  try {
+    const motionRef = doc(db, MOTIONS_COLLECTION, motionId);
+    const motionDoc = await getDoc(motionRef);
+    
+    if (motionDoc.exists()) {
+      const currentReplies = motionDoc.data().replies || [];
+      await updateDoc(motionRef, {
+        replies: [...currentReplies, {
+          ...reply,
+          createdAt: new Date().toISOString()
+        }],
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (error) {
+    console.error('Error adding reply to motion:', error);
+    throw error;
+  }
+};
+
+export const castVote = async (motionId, userId, vote) => {
+  try {
+    const motionRef = doc(db, MOTIONS_COLLECTION, motionId);
+    const motionDoc = await getDoc(motionRef);
+    
+    if (motionDoc.exists()) {
+      const currentVotes = motionDoc.data().votes || {};
+      await updateDoc(motionRef, {
+        votes: {
+          ...currentVotes,
+          [userId]: vote
+        },
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (error) {
+    console.error('Error casting vote:', error);
+    throw error;
+  }
+};
+
 // ============= USER OPERATIONS =============
 
-/**
- * Create or update a user in Firestore
- * @param {string} userId - User ID
- * @param {Object} userData - { name, email, avatar, etc. }
- */
-export const setUser = async (userId, userData) => {
+export const createOrUpdateUser = async (userData) => {
   try {
-    const userRef = doc(db, USERS_COLLECTION, userId);
-    await updateDoc(userRef, {
-      ...userData,
-      updatedAt: serverTimestamp(),
-    }).catch(async () => {
-      // If document doesn't exist, create it
+    const usersQuery = query(
+      collection(db, USERS_COLLECTION),
+      where('userId', '==', userData.userId)
+    );
+    
+    const querySnapshot = await getDocs(usersQuery);
+    
+    if (querySnapshot.empty) {
+      // Create new user
       await addDoc(collection(db, USERS_COLLECTION), {
         ...userData,
-        userId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-    });
-  } catch (error) {
-    console.error('Error setting user:', error);
-    throw error;
-  }
-};
-
-/**
- * Get a user by ID
- * @param {string} userId - User ID
- * @returns {Promise<Object>} - User data
- */
-export const getUser = async (userId) => {
-  try {
-    const userRef = doc(db, USERS_COLLECTION, userId);
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      return { id: userDoc.id, ...userDoc.data() };
+    } else {
+      // Update existing user
+      const userDoc = querySnapshot.docs[0];
+      await updateDoc(doc(db, USERS_COLLECTION, userDoc.id), {
+        ...userData,
+        updatedAt: serverTimestamp(),
+      });
     }
-    return null;
   } catch (error) {
-    console.error('Error getting user:', error);
+    console.error('Error creating/updating user:', error);
     throw error;
   }
 };
 
-/**
- * Get all users
- * @returns {Promise<Array>} - Array of users
- */
 export const getUsers = async () => {
   try {
     const querySnapshot = await getDocs(collection(db, USERS_COLLECTION));
@@ -217,96 +328,75 @@ export const getUsers = async () => {
   }
 };
 
-// ============= CHATROOM OPERATIONS =============
-
-/**
- * Create a new chatroom
- * @param {Object} chatroomData - { name, description, createdBy }
- * @returns {Promise<string>} - Document ID of the created chatroom
- */
-export const createChatroom = async (chatroomData) => {
-  try {
-    const docRef = await addDoc(collection(db, CHATROOMS_COLLECTION), {
-      ...chatroomData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
-  } catch (error) {
-    console.error('Error creating chatroom:', error);
-    throw error;
-  }
-};
-
-/**
- * Get all chatrooms
- * @returns {Promise<Array>} - Array of chatrooms
- */
-export const getChatrooms = async () => {
-  try {
-    const querySnapshot = await getDocs(collection(db, CHATROOMS_COLLECTION));
-    const chatrooms = [];
+export const subscribeToUsers = (callback) => {
+  return onSnapshot(collection(db, USERS_COLLECTION), (querySnapshot) => {
+    const users = [];
     querySnapshot.forEach((doc) => {
-      chatrooms.push({
+      users.push({
         id: doc.id,
         ...doc.data(),
       });
     });
-    return chatrooms;
+    callback(users);
+  }, (error) => {
+    console.error('Error in users subscription:', error);
+  });
+};
+
+export const updateUserRank = async (userId, rank) => {
+  try {
+    const usersQuery = query(
+      collection(db, USERS_COLLECTION),
+      where('userId', '==', userId)
+    );
+    
+    const querySnapshot = await getDocs(usersQuery);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      await updateDoc(doc(db, USERS_COLLECTION, userDoc.id), {
+        rank: rank,
+        updatedAt: serverTimestamp(),
+      });
+    }
   } catch (error) {
-    console.error('Error getting chatrooms:', error);
+    console.error('Error updating user rank:', error);
     throw error;
   }
 };
 
-/**
- * Update a chatroom
- * @param {string} chatroomId - ID of the chatroom to update
- * @param {Object} updates - Object containing fields to update
- */
-export const updateChatroom = async (chatroomId, updates) => {
+export const updateUserOnlineStatus = async (userId, online) => {
   try {
-    const chatroomRef = doc(db, CHATROOMS_COLLECTION, chatroomId);
-    await updateDoc(chatroomRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
+    const usersQuery = query(
+      collection(db, USERS_COLLECTION),
+      where('userId', '==', userId)
+    );
+    
+    const querySnapshot = await getDocs(usersQuery);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      await updateDoc(doc(db, USERS_COLLECTION, userDoc.id), {
+        online: online,
+        lastSeen: serverTimestamp(),
+      });
+    }
   } catch (error) {
-    console.error('Error updating chatroom:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete a chatroom
- * @param {string} chatroomId - ID of the chatroom to delete
- */
-export const deleteChatroom = async (chatroomId) => {
-  try {
-    await deleteDoc(doc(db, CHATROOMS_COLLECTION, chatroomId));
-  } catch (error) {
-    console.error('Error deleting chatroom:', error);
+    console.error('Error updating user online status:', error);
     throw error;
   }
 };
 
 // ============= UTILITY FUNCTIONS =============
 
-/**
- * Convert Firestore Timestamp to JavaScript Date
- * @param {Timestamp} timestamp - Firestore Timestamp
- * @returns {Date} - JavaScript Date object
- */
 export const timestampToDate = (timestamp) => {
   if (!timestamp) return null;
-  return timestamp.toDate();
+  if (timestamp.toDate) {
+    return timestamp.toDate();
+  }
+  return new Date(timestamp);
 };
 
-/**
- * Format timestamp for display
- * @param {Timestamp} timestamp - Firestore Timestamp
- * @returns {string} - Formatted time string
- */
 export const formatTimestamp = (timestamp) => {
   if (!timestamp) return '';
   const date = timestampToDate(timestamp);

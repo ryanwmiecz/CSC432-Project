@@ -27,35 +27,29 @@ header {
     justify-content: space-between;
     align-items: center;
 }
-
 header h1 {
     margin: 0;
     font-size: 1.5rem;
 }
-
 .user-profile {
     display: flex;
     align-items: center;
     gap: 0.6rem;
 }
-
 .user-profile img {
     width: 40px;
     height: 40px;
     border-radius: 50%;
     background-color: var(--secondary-light);
 }
-
 .user-profile span {
     font-weight: bold;
 }
-
 .user-profile span.status {
     display: flex;
     align-items: center;
     gap: 0.3rem;
 }
-
 .user-profile span.status::before {
     content: "";
     display: inline-block;
@@ -64,7 +58,6 @@ header h1 {
     border-radius: 50%;
     background-color: limegreen;
 }
-
 .logout-btn {
     background-color: var(--accent-orange);
     color: var(--white);
@@ -89,20 +82,17 @@ main {
     padding: 1rem;
     overflow-y: auto;
 }
-
 .sidebar h2 {
     margin-top: 0;
     color: var(--accent-orange);
 }
-
 .online-users {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-height: 40vh; /* Give users list its own scroll area */
+    max-height: 40vh;
     overflow-y: auto;
 }
-
 .online-users li {
     display: flex;
     align-items: center;
@@ -110,14 +100,12 @@ main {
     gap: 0.4rem;
     margin-bottom: 0.5rem;
 }
-
 .online-users li span.status {
     display: flex;
     align-items: center;
     gap: 0.3rem;
     font-size: 0.8rem;
 }
-
 .online-users li .status::before {
     content: "";
     display: inline-block;
@@ -126,7 +114,6 @@ main {
     border-radius: 50%;
     background-color: limegreen;
 }
-
 .online-users li .leader-symbol {
     color: var(--accent-orange);
     font-weight: bold;
@@ -138,16 +125,14 @@ main {
     margin-top: 1rem;
     display: flex;
     flex-direction: column;
-    max-height: 40vh; /* independent scroll zone */
+    max-height: 40vh;
     overflow-y: auto;
 }
-
 .committees ul {
     list-style: none;
     padding: 0;
     margin: 0;
 }
-
 .committees li {
     background-color: var(--primary-dark);
     padding: 0.5rem;
@@ -155,7 +140,6 @@ main {
     border-radius: 4px;
     cursor: pointer;
 }
-
 .committees li.active {
     background-color: var(--accent-orange);
     color: var(--white);
@@ -171,108 +155,125 @@ main {
     max-height: 100vh;
     overflow: hidden;
 }
-
 .chat-header {
     background-color: var(--secondary-light);
     padding: 1rem;
     font-weight: bold;
     flex-shrink: 0;
 }
-
 .chat-messages {
     flex: 1;
     padding: 1rem;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 1.8rem; /* spacing to account for timestamps */
+    gap: 1.8rem;
     background-color: var(--white);
 }
-
 .message {
     max-width: 70%;
     padding: 0.5rem 1rem;
-    border-radius: 20px;
+    border-radius: 10px;
     position: relative;
     word-wrap: break-word;
     margin-bottom: 0.5rem;
+    overflow: hidden; /* Prevent content from spilling out */
 }
-
 .message.sent {
     align-self: flex-end;
     background-color: var(--accent-orange);
     color: var(--white);
 }
-
 .message.received {
     align-self: flex-start;
     background-color: var(--secondary-light);
     color: var(--primary-dark);
 }
-
 .message .sender {
     font-size: 0.8rem;
     font-weight: bold;
     margin-bottom: 0.2rem;
 }
-
 .message .timestamp {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     color: gray;
     position: absolute;
-    bottom: -1.2rem;
-    right: 0.8rem;
+    bottom: -1.1rem;
+    right: 0.9rem;
+    z-index: 9999 !important; /* Added to ensure timestamp appears above other elements */
 }
-
 .message.received .timestamp {
     right: auto;
     left: 0.8rem;
+    z-index: 9999 !important; /* Added to ensure timestamp appears above other elements */
 }
 
-/* --- ATTACHMENT STYLES (NEW) --- */
+/* --- ATTACHMENT STYLES --- */
 .attachment-container {
     padding: 0.5rem;
     border-radius: 10px;
     display: flex;
     flex-direction: column;
+    max-width: 100%; /* Ensure it doesn't exceed message width */
+    overflow: hidden; /* Contain any overflow */
 }
-
 .message.sent .attachment-container {
-    background-color: #e0723a; /* Slightly darker orange */
+    background-color: #e0723a;
 }
-
 .message.received .attachment-container {
-    background-color: #b0b0b0; /* Slightly darker light grey */
+    background-color: #b0b0b0;
 }
-
 .attachment-type {
     margin: 0 0 0.5rem 0;
     font-size: 0.9rem;
     font-weight: bold;
 }
-
 .image-placeholder {
-    width: 150px;
-    height: 100px;
+    width: 100%; /* Responsive width */
+    max-width: 150px; /* Cap width */
+    aspect-ratio: 3/2; /* Maintain aspect ratio */
     background-color: var(--primary-dark);
     border: 1px solid var(--accent-orange);
     border-radius: 5px;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: var(--secondary-light);
-    text-align: center;
-    font-size: 0.7rem;
-    padding: 0.5rem;
+    overflow: hidden; /* Contain image */
 }
-
+.chat-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Show full image without cropping */
+    border-radius: 5px;
+    max-width: 100%; /* Ensure image doesn't exceed container */
+    max-height: 100px; /* Match placeholder height */
+}
 .image-caption {
     margin-top: 0.5rem;
     font-size: 0.9rem;
     font-style: italic;
+    word-wrap: break-word;
 }
 
+/* --- IMAGE PREVIEW MODAL --- */
+.image-preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.preview-image {
+    max-width: 90%;
+    max-height: 90%;
+    border-radius: 8px;
+    object-fit: contain; /* Ensure full image is visible */
+}
 
 /* --- CHAT INPUT --- */
 .chat-input-container {
@@ -280,21 +281,18 @@ main {
     flex-shrink: 0;
     position: relative;
 }
-
 .chat-input {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 1rem;
 }
-
 .chat-input input {
     flex: 1;
     padding: 0.5rem;
     border: 1px solid var(--medium-blue);
     border-radius: 4px;
 }
-
 .chat-input button {
     background-color: var(--accent-orange);
     color: var(--white);
@@ -305,10 +303,10 @@ main {
     white-space: nowrap;
 }
 
-/* --- MOCK EMOJI PICKER (NEW) --- */
+/* --- MOCK EMOJI PICKER --- */
 .emoji-picker-mock {
     position: absolute;
-    bottom: 100%; /* Position it above the input */
+    bottom: 100%;
     right: 1rem;
     background-color: var(--white);
     padding: 0.5rem;
@@ -318,13 +316,11 @@ main {
     gap: 0.5rem;
     z-index: 10;
 }
-
 .emoji-picker-mock span {
     font-size: 1.5rem;
     cursor: pointer;
     transition: transform 0.1s;
 }
-
 .emoji-picker-mock span:hover {
     transform: scale(1.1);
 }
@@ -338,19 +334,15 @@ main {
     flex-direction: column;
     overflow: hidden;
 }
-
 .motions-section h2 {
     margin-top: 0;
     color: var(--accent-orange);
 }
-
-/* scrollable motion list */
 .motions-section > div {
     flex: 1;
     overflow-y: auto;
     padding-right: 6px;
 }
-
 .motion,
 .past-decision {
     background-color: var(--primary-dark);
@@ -359,26 +351,21 @@ main {
     border-radius: 4px;
     border: 1px solid var(--secondary-light);
 }
-
 .motion h3,
 .past-decision h3 {
     margin: 0 0 0.5rem 0;
 }
-
 .motion p,
 .past-decision p {
     font-size: 0.9rem;
 }
-
 .motion .status {
     font-size: 0.8rem;
     color: var(--secondary-light);
 }
-
 .poll-interface {
     margin-top: 1rem;
 }
-
 .poll-interface button {
     background-color: var(--accent-orange);
     color: var(--white);
@@ -397,12 +384,10 @@ main {
     padding: 1rem;
     border-radius: 4px;
 }
-
 .control-panel h3 {
     margin: 0 0 0.5rem 0;
     color: var(--accent-orange);
 }
-
 .control-panel label {
     display: block;
     margin-bottom: 0.5rem;
@@ -427,7 +412,6 @@ main {
     padding: 0;
     line-height: 1;
 }
-
 .delete-msg-btn:hover {
     background-color: rgba(255, 0, 0, 0.9);
 }
@@ -439,3 +423,5 @@ main {
     color: var(--secondary-light);
     font-style: italic;
 }
+
+
