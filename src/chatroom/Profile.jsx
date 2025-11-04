@@ -8,10 +8,12 @@ export default function ProfilePage() {
   const [user, setUser] = useState(null);
   const [changeNameVal, setChangeNameVal] = useState('');
   const [changeBioVal, setChangeBioVal] = useState('');
+  const [changeImgVal, setChangeImgVal] = useState('');
 
   // Local override helpers (display name and bio) so changes don't affect login identifiers.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
   const BIO_OVERRIDES_KEY = 'profile_bio_overrides';
+  const IMAGE_OVERRIDES_KEY = 'profile_img_overrides';
   const readOverrides = (key) => {
     try {
       const raw = localStorage.getItem(key);
@@ -80,7 +82,7 @@ export default function ProfilePage() {
           username: auth0Username,
           displayName: getOverride(DISPLAY_OVERRIDES_KEY, auth0Username, auth0Username),
           bio: getOverride(BIO_OVERRIDES_KEY, auth0Username, `${auth0Username}@local.app`),
-          img: 'public/vite.svg'
+          img: getOverride(IMAGE_OVERRIDES_KEY, auth0Username, 'public/vite.svg')
         });
       } else if (!isLoading && !isAuthenticated) {
         // No token and not authenticated via SDK
@@ -95,7 +97,7 @@ export default function ProfilePage() {
           username,
           displayName: getOverride(DISPLAY_OVERRIDES_KEY, username, username),
           bio: getOverride(BIO_OVERRIDES_KEY, username, auth0User.email),
-          img: auth0User.picture || 'public/vite.svg'
+          img: getOverride(IMAGE_OVERRIDES_KEY, username, auth0User.picture || 'public/vite.svg')
         });
       }
     } else {
@@ -108,7 +110,8 @@ export default function ProfilePage() {
       // Respect any local display-name or bio overrides as well
       const displayName = getOverride(DISPLAY_OVERRIDES_KEY, u.username, u.username);
       const bio = getOverride(BIO_OVERRIDES_KEY, u.username, u.bio || '');
-      setUser({ ...u, displayName, bio });
+      const img = getOverride(IMAGE_OVERRIDES_KEY, u.username, u.img || 'public/vite.svg');
+      setUser({ ...u, displayName, bio, img });
     }
   }, [navigate, auth0Available, isAuthenticated, isLoading, auth0User]);
 
@@ -129,6 +132,36 @@ export default function ProfilePage() {
     setOverride(DISPLAY_OVERRIDES_KEY, username, newName);
     setUser({ ...user, displayName: newName });
     setChangeNameVal('');
+  };
+
+  const handleImageFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const username = user.username;
+      setOverride(IMAGE_OVERRIDES_KEY, username, dataUrl);
+      setUser({ ...user, img: dataUrl });
+    };
+    reader.onerror = () => {
+      console.error('Failed to read image file');
+      alert('Failed to read image file');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleChangeImageUrl = () => {
+    const url = changeImgVal.trim();
+    if (!url || !user) return;
+    const username = user.username;
+    setOverride(IMAGE_OVERRIDES_KEY, username, url);
+    setUser({ ...user, img: url });
+    setChangeImgVal('');
   };
 
   const handleChangeBio = () => {
@@ -183,7 +216,7 @@ export default function ProfilePage() {
     <main id="main">
       <div className="container">
         <div className="user">
-          <img id="userPic" src={user.img} alt="avatar" />
+          <img id="userPic" src={user.img} alt="avatar" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '50%' }} />
           <div id="userName">{user.displayName || user.username}</div>
         </div>
         <div className="bio">
@@ -194,6 +227,13 @@ export default function ProfilePage() {
           <button id="changeNameButton" onClick={handleChangeName}>Change Name</button>
           <input type="text" id="changeBio" placeholder="Type new bio" value={changeBioVal} onChange={e=>setChangeBioVal(e.target.value)} />
           <button id="changeBioButton" onClick={handleChangeBio}>Change Bio</button>
+          <div style={{ marginTop: 8 }}>
+            <input type="url" id="changeImgUrl" placeholder="Image URL" value={changeImgVal} onChange={e => setChangeImgVal(e.target.value)} />
+            <button id="changeImgUrlButton" onClick={handleChangeImageUrl}>Set Image URL</button>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <input type="file" accept="image/*" onChange={handleImageFile} aria-label="Upload profile image" />
+          </div>
           <button className="backButton" onClick={handleBack}>Back</button>
           <button className="logoutButton" onClick={handleLogout}>Log Out</button>
         </div>

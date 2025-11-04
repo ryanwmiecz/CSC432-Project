@@ -128,6 +128,19 @@ export default function App() {
     const map = readDisplayOverrides();
     return (id && map[id]) || (fallback && map[fallback]) || fallback || 'User';
   };
+  const IMAGE_OVERRIDES_KEY = 'profile_img_overrides';
+  const readImageOverrides = () => {
+    try {
+      const raw = localStorage.getItem(IMAGE_OVERRIDES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const getImageFor = (id, fallback) => {
+    const map = readImageOverrides();
+    return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
+  };
 
   // Firestore hooks
   const { committees, loading: committeesLoading } = useCommittees();
@@ -554,7 +567,7 @@ export default function App() {
       <header>
         <h1>Committee Dashboard</h1>
         <div className="user-profile">
-          <img src="placeholder-avatar.png" alt="Profile" />
+          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" style={{ width: 40, height: 40, borderRadius: '50%' }} />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
