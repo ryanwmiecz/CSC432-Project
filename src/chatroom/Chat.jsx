@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useMessages } from '../firebase/hooks';
 import { createMessage, formatTimestamp } from '../firebase/firestoreService';
 
@@ -10,7 +11,20 @@ export default function Chat() {
   
   // Get current user
   let currentUser = null;
-  if (window.userStore) {
+  // Try Auth0 first (SDK users), fall back to local userStore
+  try {
+    const auth0 = useAuth0();
+    if (auth0 && auth0.user) {
+      currentUser = {
+        id: auth0.user.sub || (auth0.user.email || auth0.user.name),
+        name: auth0.user.name || auth0.user.email,
+      };
+    }
+  } catch (e) {
+    // not using auth0 SDK
+  }
+
+  if (!currentUser && window.userStore) {
     const user = window.userStore.getCurrentUser();
     if (user) {
       currentUser = {
@@ -19,6 +33,23 @@ export default function Chat() {
       };
     }
   }
+
+  // Helper to read display-name overrides saved by Profile.jsx
+  const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
+  const readDisplayOverrides = () => {
+    try {
+      const raw = localStorage.getItem(DISPLAY_OVERRIDES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const getDisplayNameFor = (userId, fallbackName) => {
+    if (!userId && !fallbackName) return 'Unknown';
+    const map = readDisplayOverrides();
+    // Prefer lookup by userId (stable), then by fallbackName (older keys)
+    return map[userId] || map[fallbackName] || fallbackName || 'Unknown';
+  };
 
   useEffect(() => {
     if (!window.userStore || !window.userStore.getCurrentUser()) {
@@ -33,7 +64,7 @@ export default function Chat() {
     try {
       await createMessage({
         userId: currentUser.id,
-        userName: currentUser.name,
+        userName: getDisplayNameFor(currentUser.id, currentUser.name),
         text: input,
         chatroomId: 'default',
         attachment: null,
@@ -65,7 +96,7 @@ export default function Chat() {
       <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid #ccc', padding: 8 }}>
         {messages.map((m) => (
           <div key={m.id}>
-            <strong>{m.userName}:</strong> {m.text}{' '}
+            <strong>{getDisplayNameFor(m.userId, m.userName)}:</strong> {m.text}{' '}
             <small>({m.createdAt ? formatTimestamp(m.createdAt) : 'Just now'})</small>
           </div>
         ))}

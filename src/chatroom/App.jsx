@@ -114,6 +114,34 @@ export default function App() {
   const [currentCommitteeId, setCurrentCommitteeId] = useState(null);
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
 
+  // Display-name overrides are stored by Profile.jsx in localStorage.
+  const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
+  const readDisplayOverrides = () => {
+    try {
+      const raw = localStorage.getItem(DISPLAY_OVERRIDES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const getDisplayNameFor = (id, fallback) => {
+    const map = readDisplayOverrides();
+    return (id && map[id]) || (fallback && map[fallback]) || fallback || 'User';
+  };
+  const IMAGE_OVERRIDES_KEY = 'profile_img_overrides';
+  const readImageOverrides = () => {
+    try {
+      const raw = localStorage.getItem(IMAGE_OVERRIDES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const getImageFor = (id, fallback) => {
+    const map = readImageOverrides();
+    return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
+  };
+
   // Firestore hooks
   const { committees, loading: committeesLoading } = useCommittees();
   const { messages, loading: messagesLoading } = useMessages(currentCommitteeId, 100);
@@ -150,18 +178,18 @@ export default function App() {
       const auth0Username = localStorage.getItem('auth0_user');
 
       if (auth0Token && auth0Username) {
-        setMyData(prev => ({ ...prev, displayName: auth0Username, id: auth0Username }));
+        setMyData(prev => ({ ...prev, displayName: getDisplayNameFor(auth0Username, auth0Username), id: auth0Username }));
       } else if (!isLoading && !isAuthenticated) {
         navigate('/login');
       } else if (user) {
-        setMyData(prev => ({ ...prev, displayName: user.name || user.email, id: user.sub }));
+        setMyData(prev => ({ ...prev, displayName: getDisplayNameFor(user.sub, user.name || user.email), id: user.sub }));
       }
     } else {
       if (!window.userStore || !window.userStore.getCurrentUser()) {
         navigate('/login');
       } else {
         const currentUser = window.userStore.getCurrentUser();
-        setMyData({ displayName: currentUser.username, id: currentUser.username, rank: "Member" });
+        setMyData({ displayName: getDisplayNameFor(currentUser.username, currentUser.username), id: currentUser.username, rank: "Member" });
       }
     }
   }, [navigate, auth0Available, isAuthenticated, isLoading, user]);
@@ -178,7 +206,7 @@ export default function App() {
     if (myData.id && myData.displayName) {
       createOrUpdateUser({
         userId: myData.id,
-        name: myData.displayName,
+        name: getDisplayNameFor(myData.id, myData.displayName),
         rank: myData.rank,
         online: true,
       }).catch(console.error);
@@ -539,7 +567,7 @@ export default function App() {
       <header>
         <h1>Committee Dashboard</h1>
         <div className="user-profile">
-          <img src="placeholder-avatar.png" alt="Profile" />
+          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" style={{ width: 40, height: 40, borderRadius: '50%' }} />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
