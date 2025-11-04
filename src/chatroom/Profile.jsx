@@ -37,6 +37,35 @@ export default function ProfilePage() {
       hasUser: !!localStorage.getItem('auth0_user')
     });
     
+    // helper: read/write bio overrides in localStorage so Auth0 SDK users can have an editable bio
+    const BIO_OVERRIDES_KEY = 'profile_bio_overrides';
+    const readBioOverrides = () => {
+      try {
+        const raw = localStorage.getItem(BIO_OVERRIDES_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        return {};
+      }
+    };
+    const writeBioOverrides = (map) => {
+      try {
+        localStorage.setItem(BIO_OVERRIDES_KEY, JSON.stringify(map));
+      } catch (e) {
+        console.error('Failed to write bio overrides', e);
+      }
+    };
+    const getBioFor = (username, fallback) => {
+      if (!username) return fallback;
+      const map = readBioOverrides();
+      return map[username] || fallback;
+    };
+    const setBioFor = (username, bio) => {
+      if (!username) return;
+      const map = readBioOverrides();
+      map[username] = bio;
+      writeBioOverrides(map);
+    };
+
     if (auth0Available) {
       // Check if user logged in via our custom form (has token in localStorage)
       const auth0Token = localStorage.getItem('auth0_token');
@@ -47,7 +76,7 @@ export default function ProfilePage() {
         console.log('[Profile] Using token-based auth');
         setUser({
           username: auth0Username,
-          bio: `${auth0Username}@local.app`,
+          bio: getBioFor(auth0Username, `${auth0Username}@local.app`),
           img: 'public/vite.svg'
         });
       } else if (!isLoading && !isAuthenticated) {
@@ -60,7 +89,7 @@ export default function ProfilePage() {
         console.log('[Profile] Using SDK auth');
         setUser({
           username: auth0User.name || auth0User.email,
-          bio: auth0User.email,
+          bio: getBioFor(auth0User.name || auth0User.email, auth0User.email),
           img: auth0User.picture || 'public/vite.svg'
         });
       }
@@ -101,12 +130,26 @@ export default function ProfilePage() {
   };
 
   const handleChangeBio = () => {
-    if (auth0Available) {
-      alert('Bio changes for Auth0 users are not supported.');
-      return;
-    }
     const newBio = changeBioVal.trim();
     if (!newBio || !user) return;
+    // If Auth0 SDK or token-based auth is in use, persist a local override so the user can edit their bio
+    if (auth0Available) {
+      const username = user.username;
+      try {
+        const BIO_OVERRIDES_KEY = 'profile_bio_overrides';
+        const raw = localStorage.getItem(BIO_OVERRIDES_KEY);
+        const map = raw ? JSON.parse(raw) : {};
+        map[username] = newBio;
+        localStorage.setItem(BIO_OVERRIDES_KEY, JSON.stringify(map));
+      } catch (e) {
+        console.error('Failed to save bio override', e);
+      }
+      setUser({ ...user, bio: newBio });
+      setChangeBioVal('');
+      return;
+    }
+
+    // legacy/local userStore path
     window.userStore.changeBio(newBio);
     setUser(window.userStore.getCurrentUser());
   };
