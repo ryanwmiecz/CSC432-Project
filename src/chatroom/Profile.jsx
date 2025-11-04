@@ -9,6 +9,36 @@ export default function ProfilePage() {
   const [changeNameVal, setChangeNameVal] = useState('');
   const [changeBioVal, setChangeBioVal] = useState('');
 
+  // Local override helpers (display name and bio) so changes don't affect login identifiers.
+  const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
+  const BIO_OVERRIDES_KEY = 'profile_bio_overrides';
+  const readOverrides = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  };
+  const writeOverrides = (key, map) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(map));
+    } catch (e) {
+      console.error('Failed to write overrides', e);
+    }
+  };
+  const getOverride = (key, id, fallback) => {
+    if (!id) return fallback;
+    const map = readOverrides(key);
+    return map[id] || fallback;
+  };
+  const setOverride = (key, id, value) => {
+    if (!id) return;
+    const map = readOverrides(key);
+    map[id] = value;
+    writeOverrides(key, map);
+  };
+
   // Try to use Auth0 if available
   let auth0Available = false;
   let isAuthenticated = false;
@@ -37,35 +67,7 @@ export default function ProfilePage() {
       hasUser: !!localStorage.getItem('auth0_user')
     });
     
-    // helper: read/write bio overrides in localStorage so Auth0 SDK users can have an editable bio
-    const BIO_OVERRIDES_KEY = 'profile_bio_overrides';
-    const readBioOverrides = () => {
-      try {
-        const raw = localStorage.getItem(BIO_OVERRIDES_KEY);
-        return raw ? JSON.parse(raw) : {};
-      } catch (e) {
-        return {};
-      }
-    };
-    const writeBioOverrides = (map) => {
-      try {
-        localStorage.setItem(BIO_OVERRIDES_KEY, JSON.stringify(map));
-      } catch (e) {
-        console.error('Failed to write bio overrides', e);
-      }
-    };
-    const getBioFor = (username, fallback) => {
-      if (!username) return fallback;
-      const map = readBioOverrides();
-      return map[username] || fallback;
-    };
-    const setBioFor = (username, bio) => {
-      if (!username) return;
-      const map = readBioOverrides();
-      map[username] = bio;
-      writeBioOverrides(map);
-    };
-
+    
     if (auth0Available) {
       // Check if user logged in via our custom form (has token in localStorage)
       const auth0Token = localStorage.getItem('auth0_token');
@@ -76,7 +78,8 @@ export default function ProfilePage() {
         console.log('[Profile] Using token-based auth');
         setUser({
           username: auth0Username,
-          bio: getBioFor(auth0Username, `${auth0Username}@local.app`),
+          displayName: getOverride(DISPLAY_OVERRIDES_KEY, auth0Username, auth0Username),
+          bio: getOverride(BIO_OVERRIDES_KEY, auth0Username, `${auth0Username}@local.app`),
           img: 'public/vite.svg'
         });
       } else if (!isLoading && !isAuthenticated) {
@@ -87,9 +90,11 @@ export default function ProfilePage() {
       } else if (auth0User) {
         // Authenticated via Auth0 SDK
         console.log('[Profile] Using SDK auth');
+        const username = auth0User.name || auth0User.email;
         setUser({
-          username: auth0User.name || auth0User.email,
-          bio: getBioFor(auth0User.name || auth0User.email, auth0User.email),
+          username,
+          displayName: getOverride(DISPLAY_OVERRIDES_KEY, username, username),
+          bio: getOverride(BIO_OVERRIDES_KEY, username, auth0User.email),
           img: auth0User.picture || 'public/vite.svg'
         });
       }
@@ -100,7 +105,10 @@ export default function ProfilePage() {
         return;
       }
       const u = window.userStore.getCurrentUser();
-      setUser(u);
+      // Respect any local display-name or bio overrides as well
+      const displayName = getOverride(DISPLAY_OVERRIDES_KEY, u.username, u.username);
+      const bio = getOverride(BIO_OVERRIDES_KEY, u.username, u.bio || '');
+      setUser({ ...u, displayName, bio });
     }
   }, [navigate, auth0Available, isAuthenticated, isLoading, auth0User]);
 
@@ -113,45 +121,30 @@ export default function ProfilePage() {
   }, [user]);
 
   const handleChangeName = () => {
-    if (auth0Available) {
-      alert('Name changes for Auth0 users must be done through your Auth0 profile.');
-      return;
-    }
     const newName = changeNameVal.trim();
     if (!newName || !user) return;
-    const oldUsername = user.username;
-    const success = window.userStore.changeUser(oldUsername, newName);
-    if (success) {
-      const refreshed = window.userStore.getCurrentUser();
-      setUser(refreshed);
-    } else {
-      console.error('Failed to change username. Maybe the new name already exists.');
-    }
+    // Only change the displayed name (not the login username). Persist as a local override so it
+    // behaves the same way as the bio change.
+    const username = user.username;
+    setOverride(DISPLAY_OVERRIDES_KEY, username, newName);
+    setUser({ ...user, displayName: newName });
+    setChangeNameVal('');
   };
 
   const handleChangeBio = () => {
     const newBio = changeBioVal.trim();
     if (!newBio || !user) return;
-    // If Auth0 SDK or token-based auth is in use, persist a local override so the user can edit their bio
-    if (auth0Available) {
-      const username = user.username;
-      try {
-        const BIO_OVERRIDES_KEY = 'profile_bio_overrides';
-        const raw = localStorage.getItem(BIO_OVERRIDES_KEY);
-        const map = raw ? JSON.parse(raw) : {};
-        map[username] = newBio;
-        localStorage.setItem(BIO_OVERRIDES_KEY, JSON.stringify(map));
-      } catch (e) {
-        console.error('Failed to save bio override', e);
-      }
+    const username = user.username;
+    // Persist a local override so the bio change behaves the same across auth types.
+    setOverride(BIO_OVERRIDES_KEY, username, newBio);
+    // If using local userStore, also update its stored bio for compatibility.
+    if (!auth0Available && window.userStore) {
+      window.userStore.changeBio(newBio);
+      setUser(window.userStore.getCurrentUser());
+    } else {
       setUser({ ...user, bio: newBio });
-      setChangeBioVal('');
-      return;
     }
-
-    // legacy/local userStore path
-    window.userStore.changeBio(newBio);
-    setUser(window.userStore.getCurrentUser());
+    setChangeBioVal('');
   };
 
   const handleBack = () => {
@@ -191,7 +184,7 @@ export default function ProfilePage() {
       <div className="container">
         <div className="user">
           <img id="userPic" src={user.img} alt="avatar" />
-          <div id="userName">{user.username}</div>
+          <div id="userName">{user.displayName || user.username}</div>
         </div>
         <div className="bio">
           <div id="bioText">{user.bio}</div>
