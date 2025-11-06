@@ -71,7 +71,7 @@ header h1 {
 main {
     flex: 1;
     display: flex;
-    height: calc(100vh - 80px); /* Adjust for header height */
+    height: calc(100vh - 80px);
     overflow: hidden;
 }
 
@@ -99,6 +99,7 @@ main {
     justify-content: space-between;
     gap: 0.4rem;
     margin-bottom: 0.5rem;
+    flex-wrap: wrap;
 }
 .online-users li span.status {
     display: flex;
@@ -167,17 +168,19 @@ main {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 1.8rem;
+    gap: 0.75rem;
     background-color: var(--white);
 }
 .message {
     max-width: 70%;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
     position: relative;
     word-wrap: break-word;
+    word-break: break-word;
     margin-bottom: 0.5rem;
-    overflow: hidden; /* Prevent content from spilling out */
+    display: flex;
+    flex-direction: column;
 }
 .message.sent {
     align-self: flex-end;
@@ -192,67 +195,73 @@ main {
 .message .sender {
     font-size: 0.8rem;
     font-weight: bold;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.3rem;
+}
+.message .message-content {
+    margin: 0.2rem 0;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+.message .text-message {
+    white-space: pre-wrap;
+    line-height: 1.4;
 }
 .message .timestamp {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     color: gray;
-    position: absolute;
-    bottom: -1.1rem;
-    right: 0.9rem;
-    z-index: 9999 !important; /* Added to ensure timestamp appears above other elements */
+    margin-top: 0.5rem;
+    align-self: flex-end;
 }
 .message.received .timestamp {
-    right: auto;
-    left: 0.8rem;
-    z-index: 9999 !important; /* Added to ensure timestamp appears above other elements */
+    align-self: flex-start;
 }
 
 /* --- ATTACHMENT STYLES --- */
 .attachment-container {
-    padding: 0.5rem;
-    border-radius: 10px;
     display: flex;
     flex-direction: column;
-    max-width: 100%; /* Ensure it doesn't exceed message width */
-    overflow: hidden; /* Contain any overflow */
+    max-width: 100%;
+    gap: 0.5rem;
 }
 .message.sent .attachment-container {
-    background-color: #e0723a;
+    background-color: transparent;
 }
 .message.received .attachment-container {
-    background-color: #b0b0b0;
+    background-color: transparent;
 }
 .attachment-type {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.9rem;
+    margin: 0;
+    font-size: 0.85rem;
     font-weight: bold;
 }
 .image-placeholder {
-    width: 100%; /* Responsive width */
-    max-width: 150px; /* Cap width */
-    aspect-ratio: 3/2; /* Maintain aspect ratio */
-    background-color: var(--primary-dark);
-    border: 1px solid var(--accent-orange);
-    border-radius: 5px;
+    max-width: 300px;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden; /* Contain image */
+    cursor: pointer;
 }
 .chat-image {
     width: 100%;
-    height: 100%;
-    object-fit: contain; /* Show full image without cropping */
-    border-radius: 5px;
-    max-width: 100%; /* Ensure image doesn't exceed container */
-    max-height: 100px; /* Match placeholder height */
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    display: block;
+    border-radius: 8px;
 }
 .image-caption {
-    margin-top: 0.5rem;
+    margin: 0.5rem 0 0 0;
     font-size: 0.9rem;
     font-style: italic;
     word-wrap: break-word;
+    word-break: break-word;
 }
 
 /* --- IMAGE PREVIEW MODAL --- */
@@ -262,17 +271,18 @@ main {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    cursor: pointer;
 }
 .preview-image {
     max-width: 90%;
     max-height: 90%;
     border-radius: 8px;
-    object-fit: contain; /* Ensure full image is visible */
+    object-fit: contain;
 }
 
 /* --- CHAT INPUT --- */
@@ -323,6 +333,19 @@ main {
 }
 .emoji-picker-mock span:hover {
     transform: scale(1.1);
+}
+
+/* --- NO COMMITTEE SELECTED --- */
+.no-committee-selected {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.no-committee-selected .chat-messages {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 /* --- MOTIONS SECTION --- */
@@ -376,6 +399,25 @@ main {
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
+.new-motion {
+    margin-bottom: 1rem;
+}
+.new-motion form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.new-motion input,
+.new-motion textarea,
+.new-motion select {
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--secondary-light);
+}
+.new-motion textarea {
+    min-height: 60px;
+    resize: vertical;
+}
 
 /* --- CONTROL PANEL --- */
 .control-panel {
@@ -396,15 +438,15 @@ main {
 /* --- DELETE MESSAGE BUTTON --- */
 .delete-msg-btn {
     position: absolute;
-    top: 0.2rem;
-    right: 0.2rem;
+    top: 0.3rem;
+    right: 0.3rem;
     background-color: rgba(255, 0, 0, 0.7);
     color: white;
     border: none;
     border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    font-size: 14px;
+    width: 22px;
+    height: 22px;
+    font-size: 16px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -424,4 +466,112 @@ main {
     font-style: italic;
 }
 
+/* --- MOTION HISTORY --- */
+.motion-history {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+.motion-history h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--accent-orange);
+}
+.motion-history ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.motion-history li {
+    font-size: 0.8rem;
+    margin-bottom: 0.3rem;
+}
 
+/* --- REPLIES SECTION --- */
+.replies {
+    margin-top: 1rem;
+}
+.replies h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--accent-orange);
+}
+.replies ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.5rem 0;
+    max-height: 150px;
+    overflow-y: auto;
+}
+.replies li {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+.replies form {
+    display: flex;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+.replies form select,
+.replies form input {
+    padding: 0.3rem;
+    border-radius: 4px;
+    border: 1px solid var(--secondary-light);
+}
+.replies form input {
+    flex: 1;
+}
+.replies form button {
+    background-color: var(--accent-orange);
+    color: var(--white);
+    border: none;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+/* --- VOTES SECTION --- */
+.votes {
+    margin-top: 1rem;
+}
+.votes h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--accent-orange);
+}
+.votes ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 100px;
+    overflow-y: auto;
+}
+.votes li {
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+}
+
+/* --- ADD USER SECTION --- */
+.add-user {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.add-user select {
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--secondary-light);
+}
+.add-user button {
+    background-color: var(--accent-orange);
+    color: var(--white);
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+}
