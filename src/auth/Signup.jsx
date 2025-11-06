@@ -48,15 +48,54 @@ export default function Signup() {
     setIsSubmitting(true);
     
     const u = username && username.trim();
+    
+    // Username validation
     if (!u) { 
       setWarning('Please enter a username.'); 
       setIsSubmitting(false);
       return; 
     }
+    if (u.length < 3) {
+      setWarning('Username must be at least 3 characters long.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(u)) {
+      setWarning('Username can only contain letters, numbers, hyphens, and underscores.');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Password validation
     if (!password) { 
       setWarning('Please enter a password.'); 
       setIsSubmitting(false);
       return; 
+    }
+    if (password.length < 8) {
+      setWarning('Password must be at least 8 characters long.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      setWarning('Password must contain at least one lowercase letter.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      setWarning('Password must contain at least one uppercase letter.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      setWarning('Password must contain at least one number.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/(?=.*[!@#$%^&*])/.test(password)) {
+      setWarning('Password must contain at least one special character (!@#$%^&*).');
+      setIsSubmitting(false);
+      return;
     }
     if (password !== passwordRe) { 
       setWarning('Passwords do not match.'); 
@@ -99,15 +138,48 @@ export default function Signup() {
           navigate('/login');
         } else {
           console.error('[Signup] Signup failed:', data);
-          // Extract error message (data.description is an object, use data.message instead)
-          let errorMessage = 'Signup failed.';
+          // Extract error message and provide user-friendly feedback
+          let errorMessage = 'Signup failed. Please try again.';
+          
+          // Check for password strength errors
           if (data.code === 'invalid_password' || data.name === 'PasswordStrengthError') {
             errorMessage = 'Password must be at least 8 characters with uppercase, lowercase, number, and special character (!@#$%^&*).';
+          } 
+          // Check for duplicate user errors - Auth0 returns 'invalid_signup' for user exists
+          else if (data.code === 'invalid_signup') {
+            errorMessage = `Account with username "${u}" already exists. Please choose a different username.`;
+          }
+          // Check for user_exists or username_exists errors
+          else if (data.code === 'user_exists' || data.code === 'username_exists') {
+            errorMessage = `Account with username "${u}" already exists. Please choose a different username.`;
+          }
+          // Check error messages for "already exists" or "user exists" phrases
+          else if (data.description && typeof data.description === 'string' && 
+                   (data.description.toLowerCase().includes('already exists') || 
+                    data.description.toLowerCase().includes('user exists'))) {
+            errorMessage = `Account with username "${u}" already exists. Please choose a different username.`;
+          }
+          else if (data.message && typeof data.message === 'string' && 
+                   (data.message.toLowerCase().includes('already exists') || 
+                    data.message.toLowerCase().includes('user exists'))) {
+            errorMessage = `Account with username "${u}" already exists. Please choose a different username.`;
+          }
+          else if (data.error_description && typeof data.error_description === 'string' && 
+                   (data.error_description.toLowerCase().includes('already exists') || 
+                    data.error_description.toLowerCase().includes('user exists'))) {
+            errorMessage = `Account with username "${u}" already exists. Please choose a different username.`;
+          }
+          // Fallback to provided error messages
+          else if (data.description && typeof data.description === 'string') {
+            errorMessage = data.description;
           } else if (data.message) {
             errorMessage = data.message;
           } else if (data.error_description) {
             errorMessage = data.error_description;
+          } else if (data.error) {
+            errorMessage = data.error;
           }
+          
           setWarning(errorMessage);
           setIsSubmitting(false);
         }
@@ -118,9 +190,23 @@ export default function Signup() {
       }
     } else {
       // Fallback to local userStore
-      const added = window.userStore ? window.userStore.addUser(u, password) : false;
+      if (!window.userStore) {
+        setWarning('User management system is unavailable. Please try again later.');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Check if username already exists
+      const existingUser = window.userStore.getUser(u);
+      if (existingUser) {
+        setWarning(`Account with username "${u}" already exists. Please choose a different username.`);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const added = window.userStore.addUser(u, password);
       if (!added) { 
-        setWarning('Username already exists or store unavailable.'); 
+        setWarning(`Account with username "${u}" already exists. Please choose a different username.`); 
         setIsSubmitting(false);
         return; 
       }
