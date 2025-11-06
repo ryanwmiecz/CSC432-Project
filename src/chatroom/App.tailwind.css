@@ -1,0 +1,434 @@
+/* Tailwind-based styling for App.jsx - Using @apply for existing class names */
+
+/* Dashboard container */
+.dashboard {
+  @apply flex flex-col h-screen bg-primary text-white font-sans;
+}
+
+/* Header */
+header {
+  @apply bg-medium-blue p-3 flex justify-between items-center;
+}
+
+header h1 {
+  @apply text-xl font-bold m-0;
+}
+
+.user-profile {
+  @apply flex items-center gap-3;
+}
+
+.user-profile img {
+  @apply w-10 h-10 rounded-full;
+}
+
+.user-profile span {
+  @apply font-semibold text-sm;
+}
+
+.user-profile .status {
+  @apply flex items-center gap-1 text-xs;
+}
+
+.user-profile .status::before {
+  content: "";
+  @apply inline-block w-2 h-2 rounded-full bg-green-500;
+}
+
+.user-profile button {
+  @apply bg-secondary text-primary font-semibold py-1.5 px-3 text-sm rounded-button transition-all duration-200;
+}
+
+.user-profile button:hover {
+  @apply bg-opacity-80;
+}
+
+.logout-btn {
+  @apply bg-accent text-white;
+}
+
+/* Main layout */
+main {
+  @apply flex flex-1 overflow-hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  @apply w-64 bg-medium-blue p-4 overflow-y-auto;
+}
+
+.sidebar h2 {
+  @apply text-accent font-bold text-lg mb-2 mt-0;
+}
+
+.sidebar p {
+  @apply text-sm mb-4;
+}
+
+.online-users {
+  @apply list-none p-0 m-0 mb-6;
+}
+
+.online-users li {
+  @apply flex items-center gap-2 mb-3 text-sm;
+}
+
+.online-users li .avatar {
+  @apply w-8 h-8 rounded-full bg-secondary;
+}
+
+.online-users li .status {
+  @apply flex items-center gap-1 text-xs;
+}
+
+.online-users li .status::before {
+  content: "";
+  @apply inline-block w-2 h-2 rounded-full bg-green-500;
+}
+
+.online-users li .leader-symbol {
+  @apply text-accent font-bold ml-auto;
+}
+
+.online-users li select {
+  @apply text-xs px-1 py-0.5 rounded text-primary bg-white border-0;
+}
+
+/* Committees */
+.committees {
+  @apply mt-6;
+}
+
+.committees input {
+  @apply w-full px-2 py-1.5 text-sm rounded-input text-primary bg-white border-0 mb-2;
+}
+
+.committees button {
+  @apply w-full bg-secondary text-primary font-semibold py-1.5 px-3 text-sm rounded-button transition-all duration-200 mb-3;
+}
+
+.committees button:hover {
+  @apply bg-opacity-80;
+}
+
+.committees ul {
+  @apply list-none p-0 m-0;
+}
+
+.committees li {
+  @apply p-2 mb-2 rounded cursor-pointer transition-colors text-sm bg-primary;
+}
+
+.committees li:hover {
+  @apply bg-opacity-80;
+}
+
+.committees li.active {
+  @apply bg-accent text-white;
+}
+
+.add-user {
+  @apply mb-4;
+}
+
+.add-user select {
+  @apply w-full px-2 py-1.5 text-sm rounded-input text-primary bg-white border-0 mb-2;
+}
+
+.add-user button {
+  @apply w-full bg-secondary text-primary font-semibold py-1.5 px-3 text-sm rounded-button transition-all duration-200;
+}
+
+.add-user button:hover {
+  @apply bg-opacity-80;
+}
+
+/* Chat section */
+.chat-section {
+  @apply flex-1 flex flex-col bg-white text-primary max-h-screen overflow-hidden;
+}
+
+.chat-header {
+  @apply bg-secondary p-3 font-semibold;
+}
+
+.chat-messages {
+  @apply flex-1 p-4 overflow-y-auto flex flex-col gap-2;
+}
+
+.loading-messages {
+  @apply text-center text-secondary italic py-8;
+}
+
+/* Messages */
+.message {
+  @apply max-w-[70%] p-3 rounded-lg relative mb-6;
+}
+
+.message.sent {
+  @apply self-end bg-accent text-white shadow-message-right;
+}
+
+.message.received {
+  @apply self-start bg-secondary text-primary shadow-message-left;
+}
+
+.message .sender {
+  @apply text-xs font-bold mb-1;
+}
+
+.message .message-content {
+  @apply text-sm;
+}
+
+.message .timestamp {
+  @apply text-xs text-gray-500 absolute -bottom-5 right-2;
+}
+
+.message.received .timestamp {
+  @apply right-auto left-2;
+}
+
+.message .delete-msg-btn {
+  @apply absolute top-1 right-1 bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm leading-none p-0 transition-colors;
+}
+
+/* Attachment styles */
+.attachment-container {
+  @apply flex flex-col;
+}
+
+.attachment-type {
+  @apply text-sm font-semibold mb-2;
+}
+
+.image-placeholder {
+  @apply w-full max-w-[150px] bg-primary border border-accent rounded overflow-hidden;
+}
+
+.chat-image {
+  @apply w-full h-full object-contain max-h-[100px] cursor-pointer;
+}
+
+.image-caption {
+  @apply mt-2 text-sm italic;
+}
+
+.image-preview-modal {
+  @apply fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50;
+}
+
+.preview-image {
+  @apply max-w-[90%] max-h-[90%] rounded-lg object-contain;
+}
+
+/* Chat input */
+.chat-input-container {
+  @apply bg-secondary relative;
+}
+
+.chat-input {
+  @apply flex items-center gap-2 p-4;
+}
+
+.chat-input input {
+  @apply flex-1 px-3 py-2 text-sm rounded-input border-2 border-medium-blue focus:border-accent focus:outline-none transition-colors text-primary bg-white;
+}
+
+.chat-input button {
+  @apply bg-accent text-white font-semibold py-2 px-4 text-sm rounded-button transition-all duration-200;
+}
+
+.chat-input button:hover {
+  @apply bg-opacity-80;
+}
+
+/* Emoji picker */
+.emoji-picker-mock {
+  @apply absolute bottom-full right-4 bg-white p-2 rounded-t-lg shadow-lg flex gap-2 z-10;
+}
+
+.emoji-picker-mock span {
+  @apply text-2xl cursor-pointer transition-transform;
+}
+
+.emoji-picker-mock span:hover {
+  @apply scale-110;
+}
+
+/* Motions section */
+.motions-section {
+  @apply w-80 bg-medium-blue p-4 flex flex-col overflow-hidden;
+}
+
+.motions-section h2 {
+  @apply mt-0 text-accent font-bold text-lg mb-3;
+}
+
+.motions-section > div {
+  @apply flex-1 overflow-y-auto pr-1;
+}
+
+.new-motion {
+  @apply mb-4 p-3 bg-primary rounded;
+}
+
+.new-motion h3 {
+  @apply text-accent text-base font-bold mb-2 mt-0;
+}
+
+.new-motion form input,
+.new-motion form textarea,
+.new-motion form select {
+  @apply w-full px-2 py-1.5 text-sm rounded-input text-primary bg-white border-0 mb-2;
+}
+
+.new-motion form textarea {
+  @apply min-h-[60px];
+}
+
+.new-motion form button {
+  @apply w-full bg-secondary text-primary font-semibold py-1.5 px-3 text-sm rounded-button transition-all duration-200;
+}
+
+.new-motion form button:hover {
+  @apply bg-opacity-80;
+}
+
+/* Motion cards */
+.motion,
+.past-decision {
+  @apply bg-primary p-3 mb-3 rounded border border-secondary;
+}
+
+.motion h3,
+.past-decision h3 {
+  @apply text-accent text-base font-bold mb-2 mt-0;
+}
+
+.motion p,
+.past-decision p {
+  @apply text-sm mb-2;
+}
+
+.motion .status {
+  @apply text-xs text-secondary mb-1;
+}
+
+.motion small {
+  @apply text-xs text-secondary;
+}
+
+.motion button,
+.past-decision button {
+  @apply bg-secondary text-primary font-semibold py-1.5 px-3 text-sm rounded-button transition-all duration-200 mr-2 mb-2;
+}
+
+.motion button:hover,
+.past-decision button:hover {
+  @apply bg-opacity-80;
+}
+
+.motion button:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+.motion .replies {
+  @apply mt-3 p-2 bg-opacity-10 bg-white rounded;
+}
+
+.motion .replies h4 {
+  @apply text-sm font-bold text-accent mb-2;
+}
+
+.motion .replies ul {
+  @apply list-none p-0 m-0 mb-2 text-xs space-y-1;
+}
+
+.motion .replies li {
+  @apply mb-1;
+}
+
+.motion .replies .pro {
+  @apply text-green-400 font-bold;
+}
+
+.motion .replies .con {
+  @apply text-red-400 font-bold;
+}
+
+.motion .replies .neutral {
+  @apply text-yellow-400 font-bold;
+}
+
+.motion .replies form {
+  @apply mb-2;
+}
+
+.motion .replies form input,
+.motion .replies form select {
+  @apply w-full px-2 py-1 text-xs rounded-input text-primary bg-white border-0 mb-1;
+}
+
+.motion .replies form button {
+  @apply w-full text-xs py-1 mb-1;
+}
+
+.motion .votes {
+  @apply mt-2 text-xs;
+}
+
+.motion .votes h4 {
+  @apply text-sm font-bold text-accent mb-1;
+}
+
+.motion .votes ul {
+  @apply list-none p-0 m-0 text-xs;
+}
+
+/* Poll interface */
+.poll-interface {
+  @apply mt-2;
+}
+
+.poll-interface p {
+  @apply text-xs mb-2;
+}
+
+.poll-interface button {
+  @apply w-full mb-2;
+}
+
+/* Control panel */
+.control-panel {
+  @apply mt-3 bg-primary p-3 rounded;
+}
+
+.control-panel h3 {
+  @apply text-accent text-base font-bold mb-2 mt-0;
+}
+
+.control-panel label {
+  @apply block mb-2 text-sm;
+}
+
+.control-panel input[type="checkbox"] {
+  @apply mr-2;
+}
+
+/* Motion history */
+.motion-history {
+  @apply mt-3 p-2 bg-opacity-20 bg-white rounded;
+}
+
+.motion-history h4 {
+  @apply text-accent text-sm font-bold mb-2;
+}
+
+.motion-history ul {
+  @apply text-xs space-y-1 list-none p-0 m-0;
+}
+
+.motion-history li {
+  @apply text-white opacity-90;
+}

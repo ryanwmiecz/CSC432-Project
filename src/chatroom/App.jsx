@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 //import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import "./App.css";
+import "./App.tailwind.css";
 import { useMessages, useCommittees, useMotions, useUsers } from '../firebase/hooks';
 import {
   createMessage,
@@ -40,47 +40,57 @@ const ChatMessage = ({ m, myData, users, onDelete }) => {
   };
 
   return (
-    <div className={`message ${isMine ? "sent" : "received"}`} role="listitem">
-      <div className="sender">{sender}</div>
+    <div 
+      className={`max-w-[70%] p-3 rounded-lg relative mb-6 ${
+        isMine 
+          ? 'self-end bg-accent text-white shadow-message-right' 
+          : 'self-start bg-secondary text-primary shadow-message-left'
+      }`} 
+      role="listitem"
+    >
+      <div className="text-xs font-bold mb-1">{sender}</div>
       {m.attachment && isValidBase64Image(m.attachment.base64) ? (
-        <div className="message-content attachment-container">
-          <p className="attachment-type">🖼️ Image Attachment</p>
-          <div className="image-placeholder">
+        <div className="flex flex-col">
+          <p className="text-sm font-semibold mb-2">🖼️ Image Attachment</p>
+          <div className="w-full max-w-[150px] bg-primary border border-accent rounded overflow-hidden">
             <img
               src={m.attachment.base64}
               alt={m.attachment.name || "Attachment"}
-              className="chat-image"
+              className="w-full h-full object-contain max-h-[100px] cursor-pointer"
               onClick={() => setIsPreviewOpen(true)}
               aria-label="Click to preview image"
             />
             {isPreviewOpen && (
-              <div className="image-preview-modal" onClick={() => setIsPreviewOpen(false)}>
+              <div 
+                className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50"
+                onClick={() => setIsPreviewOpen(false)}
+              >
                 <img
                   src={m.attachment.base64}
                   alt="Full-size attachment"
-                  className="preview-image"
+                  className="max-w-[90%] max-h-[90%] rounded-lg object-contain"
                 />
               </div>
             )}
           </div>
-          {m.text && <p className="image-caption">{m.text}</p>}
+          {m.text && <p className="mt-2 text-sm italic">{m.text}</p>}
         </div>
       ) : m.attachment ? (
-        <div className="message-content attachment-container">
+        <div className="flex flex-col">
           <p>Invalid or unsupported image attachment</p>
-          <p style={{ fontSize: '0.8rem', color: 'var(--secondary-light)' }}>
+          <p className="text-xs opacity-75 mt-1">
             {m.attachment.name}
           </p>
         </div>
       ) : (
-        <div className="message-content text-message">{m.msg || m.text}</div>
+        <div className="text-sm">{m.msg || m.text}</div>
       )}
-      <span className="timestamp">
+      <span className="text-xs text-gray-500 absolute -bottom-5 right-2">
         {m.createdAt ? formatTimestamp(m.createdAt) : m.time}
       </span>
       {isMine && onDelete && (
         <button
-          className="delete-msg-btn"
+          className="absolute top-1 right-1 bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm leading-none p-0 transition-colors"
           onClick={() => onDelete(m.id)}
           aria-label="Delete message"
         >
@@ -93,11 +103,11 @@ const ChatMessage = ({ m, myData, users, onDelete }) => {
 
 // Component for motion history log
 const MotionHistory = ({ history }) => (
-  <div className="motion-history">
-    <h4>Motion History</h4>
-    <ul>
+  <div className="mt-3 p-2 bg-opacity-20 bg-white rounded">
+    <h4 className="text-accent text-sm font-bold mb-2">Motion History</h4>
+    <ul className="text-xs space-y-1">
       {history.map((entry, index) => (
-        <li key={index}>
+        <li key={index} className="text-white opacity-90">
           {entry.action} by {entry.userName} at {formatTimestamp(entry.timestamp)}
         </li>
       ))}
@@ -567,14 +577,14 @@ export default function App() {
       <header>
         <h1>Committee Dashboard</h1>
         <div className="user-profile">
-          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
           <button className="logout-btn" onClick={handleLogout} aria-label="Log out">Logout</button>
         </div>
       </header>
-      <main>
+      <main className="flex flex-1 overflow-hidden">
         <aside className="sidebar">
           <h2>Online Users ({onlineUsers.length}/{currentUsers.length})</h2>
           <p>Quorum: {quorumMet ? 'Met' : 'Not Met'}</p>
