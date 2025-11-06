@@ -2,11 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom animation for message fade-in */
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-in;
 }
 
 @keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+/* Global styles */
+@layer base {
+  body {
+    @apply font-sans;
+  }
+}
+
+/* Utility classes for easy spacing adjustment */
+@layer utilities {
+  .spacing-tight {
+    @apply gap-tight;
+  }
+  
+  .spacing-compact {
+    @apply gap-compact;
+  }
+  
+  /* Remove message shadows if needed - just add 'no-shadow' class */
+  .no-shadow {
+    box-shadow: none !important;
+  }
 }

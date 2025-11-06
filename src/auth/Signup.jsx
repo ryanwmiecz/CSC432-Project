@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
-import './Signup.css';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -217,60 +216,66 @@ export default function Signup() {
 
   if (auth0Available && isLoading) {
     return (
-      <main id="main">
-        <div className="loginWindow">
-          <h1>Loading...</h1>
+      <main className="min-h-screen flex items-center justify-center bg-medium-blue border-[30px] border-accent">
+        <div className="bg-primary rounded-card p-8 shadow-card">
+          <h1 className="text-accent text-2xl font-bold">Loading...</h1>
         </div>
       </main>
     );
   }
 
   return (
-    <main id="main">
-      <div className="loginWindow">
-        <h1>Sign Up</h1>
+    <main className="min-h-screen flex items-center justify-center bg-medium-blue p-4 border-[30px] border-accent overflow-auto">
+      <div className="bg-primary rounded-card p-8 w-full max-w-md flex flex-col items-center gap-compact shadow-card my-4">
+        <h1 className="text-accent text-3xl font-bold mb-2">Sign Up</h1>
         {isSubmitting ? (
-          <div style={{color: 'white', textAlign: 'center', margin: '20px 0'}}>
+          <div className="text-white text-center my-5">
             Creating your account...
           </div>
         ) : (
           <>
-            <h2>Create a username</h2>
-            <div className="username">
+            <h2 className="text-white text-base font-medium mb-1 self-start w-full">Create a username</h2>
+            <div className="w-full mb-compact">
               <input 
                 type="text" 
-                className="usernameInput" 
+                className="w-full px-4 py-2.5 rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white" 
                 placeholder="Username" 
                 value={username} 
                 onChange={e=>setUsername(e.target.value)}
                 disabled={isSubmitting}
               />
             </div>
-            <h2>Create a password</h2>
-            <div className="password">
+            
+            <h2 className="text-white text-base font-medium mb-1 self-start w-full mt-2">Create a password</h2>
+            <div className="w-full mb-compact">
               <input 
                 type="password" 
-                className="passwordInput" 
+                className="w-full px-4 py-2.5 rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white" 
                 placeholder="Password" 
                 value={password} 
                 onChange={e=>setPassword(e.target.value)}
                 disabled={isSubmitting}
               />
             </div>
-            <h2>Input the password again</h2>
-            <div className="password">
+            
+            <h2 className="text-white text-base font-medium mb-1 self-start w-full mt-2">Confirm password</h2>
+            <div className="w-full mb-compact">
               <input 
                 type="password" 
-                className="passwordInput" 
-                placeholder="Password" 
+                className="w-full px-4 py-2.5 rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white" 
+                placeholder="Confirm Password" 
                 value={passwordRe} 
                 onChange={e=>setPasswordRe(e.target.value)}
                 disabled={isSubmitting}
               />
             </div>
-            <div className="warning" id="signupWarning">{warning}</div>
+            
+            {warning && (
+              <div className="text-red-500 text-sm mb-compact text-center w-full">{warning}</div>
+            )}
+            
             <button 
-              className="signupButton" 
+              className="w-3/4 bg-secondary text-primary font-semibold py-2.5 px-6 rounded-button hover:bg-opacity-80 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2" 
               onClick={handleSignup}
               disabled={isSubmitting}
             >
@@ -279,9 +284,8 @@ export default function Signup() {
           </>
         )}
         <button 
-          className="loginButton" 
+          className="w-3/4 bg-secondary text-primary font-semibold py-2.5 px-6 rounded-button hover:bg-opacity-80 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2" 
           onClick={() => navigate('/login')}
-          style={{marginTop: '10px'}}
           disabled={isSubmitting}
         >
           Back to Login

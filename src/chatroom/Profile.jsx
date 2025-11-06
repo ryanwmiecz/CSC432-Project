@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
-import '../../src/profile.css';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -207,35 +206,124 @@ export default function ProfilePage() {
   };
 
   if (auth0Available && isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-medium-blue">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
   }
 
-  if (!user) return <div>Loading...</div>;
+  if (!user) return (
+    <div className="min-h-screen flex items-center justify-center bg-medium-blue">
+      <div className="text-white text-xl">Loading...</div>
+    </div>
+  );
 
   return (
-    <main id="main">
-      <div className="container">
-        <div className="user">
-          <img id="userPic" src={user.img} alt="avatar" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '50%' }} />
-          <div id="userName">{user.displayName || user.username}</div>
-        </div>
-        <div className="bio">
-          <div id="bioText">{user.bio}</div>
-        </div>
-        <div className="buttonContainer">
-          <input type="text" id="changeName" placeholder="Type new name" value={changeNameVal} onChange={e=>setChangeNameVal(e.target.value)} />
-          <button id="changeNameButton" onClick={handleChangeName}>Change Name</button>
-          <input type="text" id="changeBio" placeholder="Type new bio" value={changeBioVal} onChange={e=>setChangeBioVal(e.target.value)} />
-          <button id="changeBioButton" onClick={handleChangeBio}>Change Bio</button>
-          <div style={{ marginTop: 8 }}>
-            <input type="url" id="changeImgUrl" placeholder="Image URL" value={changeImgVal} onChange={e => setChangeImgVal(e.target.value)} />
-            <button id="changeImgUrlButton" onClick={handleChangeImageUrl}>Set Image URL</button>
+    <main className="min-h-screen flex items-center justify-center bg-medium-blue p-4">
+      <div className="bg-primary rounded-card p-8 w-full max-w-2xl flex flex-col shadow-card">
+        {/* User Profile Section */}
+        <div className="flex flex-col md:flex-row items-center gap-6 mb-8">
+          <img 
+            src={user.img} 
+            alt="avatar" 
+            className="w-24 h-24 object-cover rounded-full border-4 border-accent shadow-md" 
+          />
+          <div className="flex-1 text-center md:text-left">
+            <h1 className="text-white text-3xl md:text-4xl font-bold mb-2">
+              {user.displayName || user.username}
+            </h1>
+            <p className="text-secondary text-base md:text-lg">
+              {user.bio}
+            </p>
           </div>
-          <div style={{ marginTop: 8 }}>
-            <input type="file" accept="image/*" onChange={handleImageFile} aria-label="Upload profile image" />
+        </div>
+
+        {/* Edit Controls */}
+        <div className="space-y-3 max-w-xl mx-auto w-full">
+          {/* Change Name */}
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
+            <input 
+              type="text" 
+              placeholder="New display name" 
+              value={changeNameVal} 
+              onChange={e=>setChangeNameVal(e.target.value)}
+              className="w-full sm:w-64 px-3 py-2 text-sm rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white"
+            />
+            <button 
+              onClick={handleChangeName}
+              className="w-full sm:w-32 bg-secondary text-primary font-semibold py-2 px-4 text-sm rounded-button hover:bg-opacity-80 transition-all duration-200 whitespace-nowrap"
+            >
+              Change Name
+            </button>
           </div>
-          <button className="backButton" onClick={handleBack}>Back</button>
-          <button className="logoutButton" onClick={handleLogout}>Log Out</button>
+
+          {/* Change Bio */}
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
+            <input 
+              type="text" 
+              placeholder="New bio" 
+              value={changeBioVal} 
+              onChange={e=>setChangeBioVal(e.target.value)}
+              className="w-full sm:w-64 px-3 py-2 text-sm rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white"
+            />
+            <button 
+              onClick={handleChangeBio}
+              className="w-full sm:w-32 bg-secondary text-primary font-semibold py-2 px-4 text-sm rounded-button hover:bg-opacity-80 transition-all duration-200 whitespace-nowrap"
+            >
+              Change Bio
+            </button>
+          </div>
+
+          {/* Change Image URL */}
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
+            <input 
+              type="url" 
+              placeholder="Image URL" 
+              value={changeImgVal} 
+              onChange={e => setChangeImgVal(e.target.value)}
+              className="w-full sm:w-64 px-3 py-2 text-sm rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white"
+            />
+            <button 
+              onClick={handleChangeImageUrl}
+              className="w-full sm:w-32 bg-secondary text-primary font-semibold py-2 px-4 text-sm rounded-button hover:bg-opacity-80 transition-all duration-200 whitespace-nowrap"
+            >
+              Set Image
+            </button>
+          </div>
+
+          {/* Upload Image File */}
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
+            <label className="w-full sm:w-64 cursor-pointer">
+              <div className="px-3 py-2 text-sm rounded-input border-2 border-secondary text-secondary hover:border-accent hover:text-accent transition-colors text-center">
+                Choose Image File
+              </div>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageFile} 
+                aria-label="Upload profile image"
+                className="hidden"
+              />
+            </label>
+            <div className="w-full sm:w-32"></div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2 mt-6 pt-6 border-t border-secondary border-opacity-30">
+            <button 
+              onClick={handleBack}
+              className="flex-1 bg-secondary text-primary font-semibold py-2.5 px-6 rounded-button hover:bg-opacity-80 transition-all duration-200"
+            >
+              Back
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="flex-1 bg-accent text-white font-semibold py-2.5 px-6 rounded-button hover:bg-opacity-80 transition-all duration-200"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
     </main>

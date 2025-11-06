@@ -83,36 +83,79 @@ export default function Chat() {
   };
 
   if (loading) {
-    return <div style={{ padding: 20 }}>Loading messages...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-medium-blue">
+        <div className="text-white text-xl">Loading messages...</div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div style={{ padding: 20, color: 'red' }}>Error: {error.message}</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-medium-blue">
+        <div className="text-red-500 text-xl">Error: {error.message}</div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Chat</h2>
-      <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid #ccc', padding: 8 }}>
-        {messages.map((m) => (
-          <div key={m.id}>
-            <strong>{getDisplayNameFor(m.userId, m.userName)}:</strong> {m.text}{' '}
-            <small>({m.createdAt ? formatTimestamp(m.createdAt) : 'Just now'})</small>
-          </div>
-        ))}
-      </div>
-      <div style={{ marginTop: 8 }}>
-        <input 
-          value={input} 
-          onChange={e => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type a message..."
-        />
-        <button onClick={send}>Send</button>
-        <button onClick={() => navigate('/profile')} style={{ marginLeft: 8 }}>Profile</button>
-      </div>
-      <div style={{ marginTop: 12 }}>
-        <button onClick={() => { window.userStore.removeCurrentUser(); navigate('/login'); }}>Logout</button>
+    <div className="min-h-screen bg-medium-blue p-4">
+      <div className="max-w-4xl mx-auto bg-primary rounded-card shadow-card p-6">
+        <h2 className="text-accent text-2xl font-bold mb-4">Chat</h2>
+        
+        {/* Messages Container */}
+        <div className="bg-white rounded-input p-4 max-h-96 overflow-y-auto mb-4 border-2 border-secondary">
+          {messages.length === 0 ? (
+            <div className="text-gray-400 text-center py-8">No messages yet. Start the conversation!</div>
+          ) : (
+            messages.map((m) => (
+              <div key={m.id} className="mb-3 pb-3 border-b border-gray-200 last:border-b-0">
+                <div className="flex items-baseline gap-2">
+                  <strong className="text-primary font-semibold">
+                    {getDisplayNameFor(m.userId, m.userName)}:
+                  </strong>
+                  <span className="text-primary">{m.text}</span>
+                </div>
+                <small className="text-gray-500 text-xs">
+                  {m.createdAt ? formatTimestamp(m.createdAt) : 'Just now'}
+                </small>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {/* Input Area */}
+        <div className="flex gap-2 mb-4">
+          <input 
+            value={input} 
+            onChange={e => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Type a message..."
+            className="flex-1 px-3 py-2 text-sm rounded-input border-2 border-transparent focus:border-accent focus:outline-none transition-colors text-primary bg-white"
+          />
+          <button 
+            onClick={send}
+            className="bg-secondary text-primary font-semibold py-2 px-6 text-sm rounded-button hover:bg-opacity-80 transition-all duration-200"
+          >
+            Send
+          </button>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button 
+            onClick={() => navigate('/profile')}
+            className="bg-secondary text-primary font-semibold py-2 px-4 text-sm rounded-button hover:bg-opacity-80 transition-all duration-200"
+          >
+            Profile
+          </button>
+          <button 
+            onClick={() => { window.userStore.removeCurrentUser(); navigate('/login'); }}
+            className="bg-accent text-white font-semibold py-2 px-4 text-sm rounded-button hover:bg-opacity-80 transition-all duration-200"
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
