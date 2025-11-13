@@ -10,7 +10,10 @@ import {
   formatTimestamp,
   createCommittee,
   updateCommittee,
+  deleteCommittee,
   addMemberToCommittee,
+  removeMemberFromCommittee,
+  updateMemberPermission,
   createMotion,
   updateMotion,
   addReplyToMotion,
@@ -162,7 +165,6 @@ export default function App() {
   const chatRef = useRef(null);
   const motionsRef = useRef(null);
   const newComRef = useRef(null);
-  const addUserRef = useRef(null);
   const fileInputRef = useRef(null);
 
   // Auth0 integration
@@ -279,10 +281,14 @@ export default function App() {
     }
   }, [messages.length]);
 
-  const currentCommittee = committees.find((c) => c.id === currentCommitteeId) || { memberIds: [] };
+  const currentCommittee = committees.find((c) => c.id === currentCommitteeId) || { memberIds: [], memberPermissions: {} };
   const currentUsers = users.filter(u => currentCommittee.memberIds?.includes(u.userId));
   const onlineUsers = currentUsers.filter((u) => u.online);
-  const isChair = myData.rank === "Chair";
+  
+  // Get user's permission level in the current committee
+  const myPermissionInCommittee = currentCommittee.memberPermissions?.[myData.id] || 'Member';
+  const isChair = myPermissionInCommittee === 'Chair';
+  
   const availableUsers = users.filter((u) => !currentCommittee.memberIds?.includes(u.userId));
   const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 2); // 50% quorum
   
@@ -327,6 +333,9 @@ export default function App() {
       await createCommittee({
         title,
         memberIds: [myData.id],
+        memberPermissions: {
+          [myData.id]: 'Chair' // Creator is automatically Chair
+        }
       });
       newComRef.current.value = "";
     } catch (error) {
@@ -335,27 +344,59 @@ export default function App() {
     }
   };
 
-  const addUserToCommittee = async () => {
-    const userId = addUserRef.current.value;
-    if (!userId) return;
+  const leaveCommittee = async () => {
+    if (!currentCommitteeId) return;
+    
+    const memberCount = currentCommittee.memberIds?.length || 0;
+    const isLastMember = memberCount === 1;
+    
+    const confirmMessage = isLastMember 
+      ? `You are the last member of "${currentCommittee.title}". Leaving will delete this committee. Are you sure?`
+      : `Are you sure you want to leave "${currentCommittee.title}"?`;
+    
+    if (!window.confirm(confirmMessage)) return;
 
     try {
-      await addMemberToCommittee(currentCommitteeId, userId);
+      if (isLastMember) {
+        // Delete the committee if this is the last member
+        await deleteCommittee(currentCommitteeId);
+      } else {
+        // Just remove the member
+        await removeMemberFromCommittee(currentCommitteeId, myData.id);
+      }
+      
+      // Switch to another committee or home view
+      const remainingCommittees = myCommittees.filter(c => c.id !== currentCommitteeId);
+      if (remainingCommittees.length > 0) {
+        setCurrentCommitteeId(remainingCommittees[0].id);
+      } else {
+        setCurrentCommitteeId(null);
+        setShowHome(true);
+      }
     } catch (error) {
-      console.error('Error adding user to committee:', error);
-      alert('Failed to add user to committee.');
+      console.error('Error leaving committee:', error);
+      alert('Failed to leave committee.');
     }
   };
 
-  const changeUserRank = async (userId, newRank) => {
+  const changeUserRank = async (userId, newPermission) => {
     try {
-      await updateUserRank(userId, newRank);
-      if (userId === myData.id) {
-        setMyData(prev => ({ ...prev, rank: newRank }));
+      // Prevent chair from demoting themselves if they're the only chair
+      if (userId === myData.id && newPermission !== 'Chair') {
+        const chairs = Object.entries(currentCommittee.memberPermissions || {})
+          .filter(([id, perm]) => perm === 'Chair');
+        
+        if (chairs.length === 1) {
+          alert('You cannot demote yourself. You are the only Chair in this committee. Please promote another member to Chair first.');
+          return;
+        }
       }
+      
+      // Update permission in the current committee only
+      await updateMemberPermission(currentCommitteeId, userId, newPermission);
     } catch (error) {
-      console.error('Error changing user rank:', error);
-      alert('Failed to change user rank.');
+      console.error('Error changing user permission:', error);
+      alert('Failed to change user permission.');
     }
   };
 
@@ -645,39 +686,29 @@ export default function App() {
           <h2>Online Users ({onlineUsers.length}/{currentUsers.length})</h2>
           <p>Quorum: {quorumMet ? 'Met' : 'Not Met'}</p>
           <ul className="online-users" role="list">
-            {onlineUsers.map((user) => (
-              <li key={user.id}>
-                <div className="avatar" aria-hidden="true"></div>
-                <span>{user.name} ({user.rank || 'Member'})</span>
-                <span className="status">{user.online ? "Online" : "Offline"}</span>
-                {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
-                {isChair && (
-                  <select
-                    value={user.rank || 'Member'}
-                    onChange={(e) => changeUserRank(user.userId, e.target.value)}
-                    aria-label={`Change rank for ${user.name}`}
-                  >
-                    <option>Chair</option>
-                    <option>Member</option>
-                    <option>Observer</option>
-                  </select>
-                )}
-              </li>
-            ))}
+            {onlineUsers.map((user) => {
+              const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
+              return (
+                <li key={user.id}>
+                  <div className="avatar" aria-hidden="true"></div>
+                  <span>{user.name} ({userPermission})</span>
+                  <span className="status">{user.online ? "Online" : "Offline"}</span>
+                  {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
+                  {isChair && (
+                    <select
+                      value={userPermission}
+                      onChange={(e) => changeUserRank(user.userId, e.target.value)}
+                      aria-label={`Change permission for ${user.name}`}
+                    >
+                      <option>Chair</option>
+                      <option>Member</option>
+                      <option>Observer</option>
+                    </select>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-          {isChair && availableUsers.length > 0 && (
-            <div className="add-user">
-              <select ref={addUserRef} aria-label="Select user to add">
-                <option value="">Select user...</option>
-                {availableUsers.map((u) => (
-                  <option key={u.id} value={u.userId}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-              <button onClick={addUserToCommittee}>Add to Committee</button>
-            </div>
-          )}
           <div className="committees">
             <h2>Committees</h2>
             <input ref={newComRef} placeholder="New Committee Title" aria-label="New committee title" />
@@ -690,10 +721,10 @@ export default function App() {
                   <li
                     key={com.id}
                     className={com.id === currentCommitteeId ? "active" : ""}
-                    onClick={() => setCurrentCommitteeId(com.id)}
+                    onClick={() => handleCommitteeSelect(com.id)}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && setCurrentCommitteeId(com.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCommitteeSelect(com.id)}
                   >
                     {com.title}
                   </li>
@@ -776,8 +807,25 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="chat-header">
-                Chat Window - {currentCommittee.title || 'Select a Committee'}
+              <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Chat Window - {currentCommittee.title || 'Select a Committee'}</span>
+                {currentCommitteeId && (
+                  <button
+                    onClick={leaveCommittee}
+                    style={{
+                      backgroundColor: '#EF8354',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    aria-label="Leave committee"
+                  >
+                    Leave Committee
+                  </button>
+                )}
               </div>
               <div className="chat-messages" ref={chatRef} role="log" aria-live="polite">
                 {messagesLoading ? (

@@ -86,6 +86,8 @@ export const createCommittee = async (committeeData) => {
     const docRef = await addDoc(collection(db, COMMITTEES_COLLECTION), {
       ...committeeData,
       memberIds: committeeData.memberIds || [],
+      // Store permissions as object: { userId: 'Chair' | 'Member' | 'Observer' }
+      memberPermissions: committeeData.memberPermissions || {},
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -141,22 +143,84 @@ export const updateCommittee = async (committeeId, updates) => {
   }
 };
 
-export const addMemberToCommittee = async (committeeId, userId) => {
+export const deleteCommittee = async (committeeId) => {
+  try {
+    await deleteDoc(doc(db, COMMITTEES_COLLECTION, committeeId));
+  } catch (error) {
+    console.error('Error deleting committee:', error);
+    throw error;
+  }
+};
+
+export const addMemberToCommittee = async (committeeId, userId, permission = 'Member') => {
   try {
     const committeeRef = doc(db, COMMITTEES_COLLECTION, committeeId);
     const committeeDoc = await getDoc(committeeRef);
     
     if (committeeDoc.exists()) {
       const currentMembers = committeeDoc.data().memberIds || [];
+      const currentPermissions = committeeDoc.data().memberPermissions || {};
+      
       if (!currentMembers.includes(userId)) {
         await updateDoc(committeeRef, {
           memberIds: [...currentMembers, userId],
+          memberPermissions: {
+            ...currentPermissions,
+            [userId]: permission
+          },
           updatedAt: serverTimestamp(),
         });
       }
     }
   } catch (error) {
     console.error('Error adding member to committee:', error);
+    throw error;
+  }
+};
+
+export const removeMemberFromCommittee = async (committeeId, userId) => {
+  try {
+    const committeeRef = doc(db, COMMITTEES_COLLECTION, committeeId);
+    const committeeDoc = await getDoc(committeeRef);
+    
+    if (committeeDoc.exists()) {
+      const currentMembers = committeeDoc.data().memberIds || [];
+      const currentPermissions = committeeDoc.data().memberPermissions || {};
+      const updatedMembers = currentMembers.filter(memberId => memberId !== userId);
+      
+      // Remove user from permissions object
+      const { [userId]: removed, ...updatedPermissions } = currentPermissions;
+      
+      await updateDoc(committeeRef, {
+        memberIds: updatedMembers,
+        memberPermissions: updatedPermissions,
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (error) {
+    console.error('Error removing member from committee:', error);
+    throw error;
+  }
+};
+
+export const updateMemberPermission = async (committeeId, userId, permission) => {
+  try {
+    const committeeRef = doc(db, COMMITTEES_COLLECTION, committeeId);
+    const committeeDoc = await getDoc(committeeRef);
+    
+    if (committeeDoc.exists()) {
+      const currentPermissions = committeeDoc.data().memberPermissions || {};
+      
+      await updateDoc(committeeRef, {
+        memberPermissions: {
+          ...currentPermissions,
+          [userId]: permission
+        },
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (error) {
+    console.error('Error updating member permission:', error);
     throw error;
   }
 };
