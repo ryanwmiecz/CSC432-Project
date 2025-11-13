@@ -285,6 +285,9 @@ export default function App() {
   const isChair = myData.rank === "Chair";
   const availableUsers = users.filter((u) => !currentCommittee.memberIds?.includes(u.userId));
   const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 2); // 50% quorum
+  
+  // Filter committees to only show ones the user is a member of
+  const myCommittees = committees.filter(c => c.memberIds?.includes(myData.id));
 
   // Send message with optional image attachment
   const sendMessage = async (attachment = null) => {
@@ -683,7 +686,7 @@ export default function App() {
               <p>Loading committees...</p>
             ) : (
               <ul role="list">
-                {committees.map((com) => (
+                {myCommittees.map((com) => (
                   <li
                     key={com.id}
                     className={com.id === currentCommitteeId ? "active" : ""}
