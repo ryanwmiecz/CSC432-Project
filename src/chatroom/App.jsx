@@ -123,6 +123,8 @@ export default function App() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentCommitteeId, setCurrentCommitteeId] = useState(null);
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
+  const [showHome, setShowHome] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Display-name overrides are stored by Profile.jsx in localStorage.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
@@ -204,12 +206,18 @@ export default function App() {
     }
   }, [navigate, auth0Available, isAuthenticated, isLoading, user]);
 
-  // Set default committee
+  // Set default committee and auto-join if not a member
   useEffect(() => {
     if (committees.length > 0 && !currentCommitteeId) {
-      setCurrentCommitteeId(committees[0].id);
+      const firstCommittee = committees[0];
+      setCurrentCommitteeId(firstCommittee.id);
+      
+      // Auto-join the first committee if user is not already a member
+      if (myData.id && !firstCommittee.memberIds?.includes(myData.id)) {
+        addMemberToCommittee(firstCommittee.id, myData.id).catch(console.error);
+      }
     }
-  }, [committees, currentCommitteeId]);
+  }, [committees, currentCommitteeId, myData.id]);
 
   // Create/update user in Firestore on mount
   useEffect(() => {
@@ -223,18 +231,45 @@ export default function App() {
     }
   }, [myData.id, myData.displayName, myData.rank]);
 
-  // Update online status on visibility change
+  // Update online status on visibility change and cleanup
   useEffect(() => {
     if (!myData.id) return;
+    
     const handleVisibility = () => {
       const isOnline = document.visibilityState === 'visible';
       updateUserOnlineStatus(myData.id, isOnline).catch(console.error);
     };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    handleVisibility();
+    const handleBeforeUnload = (e) => {
+      // Use navigator.sendBeacon for more reliable status update on page close
+      // Note: This requires a REST endpoint, so we'll use the regular update
+      // but flag it to not wait for response
+      navigator.sendBeacon && updateUserOnlineStatus(myData.id, false);
+      if (!navigator.sendBeacon) {
+        // Fallback for browsers without sendBeacon
+        updateUserOnlineStatus(myData.id, false);
+      }
+    };
 
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    const handlePageHide = () => {
+      // pagehide is more reliable than beforeunload for setting offline status
+      updateUserOnlineStatus(myData.id, false).catch(console.error);
+    };
+
+    // Set online when component mounts
+    updateUserOnlineStatus(myData.id, true).catch(console.error);
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      // Set offline when component unmounts or user logs out
+      updateUserOnlineStatus(myData.id, false).catch(console.error);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
   }, [myData.id]);
 
   // Auto-scroll chat to bottom
@@ -550,9 +585,9 @@ export default function App() {
   }
 };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (myData.id) {
-      updateUserOnlineStatus(myData.id, false).catch(console.error);
+      await updateUserOnlineStatus(myData.id, false).catch(console.error);
     }
     localStorage.removeItem('auth0_token');
     localStorage.removeItem('auth0_user');
@@ -572,6 +607,23 @@ export default function App() {
   const activeMotions = motions.filter(m => !m.recorded);
   const pastDecisions = motions.filter(m => m.recorded);
 
+  const handleCommitteeSelect = (committeeId) => {
+    const selectedCommittee = committees.find(c => c.id === committeeId);
+    
+    // Auto-join committee if not already a member
+    if (myData.id && selectedCommittee && !selectedCommittee.memberIds?.includes(myData.id)) {
+      addMemberToCommittee(committeeId, myData.id).catch(console.error);
+    }
+    
+    setCurrentCommitteeId(committeeId);
+    setShowHome(false);
+  };
+
+  // Filter committees based on search query
+  const filteredCommittees = committees.filter(committee =>
+    committee.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="dashboard" role="main">
       <header>
@@ -580,6 +632,7 @@ export default function App() {
           <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
+          <button onClick={() => setShowHome(true)} aria-label="Go to home">Home</button>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
           <button className="logout-btn" onClick={handleLogout} aria-label="Log out">Logout</button>
         </div>
@@ -647,60 +700,135 @@ export default function App() {
           </div>
         </aside>
         <section className="chat-section">
-          <div className="chat-header">
-            Chat Window - {currentCommittee.title || 'Select a Committee'}
-          </div>
-          <div className="chat-messages" ref={chatRef} role="log" aria-live="polite">
-            {messagesLoading ? (
-              <div className="loading-messages">Loading messages...</div>
-            ) : (
-              messages.map((m) => (
-                <ChatMessage
-                  key={m.id}
-                  m={m}
-                  myData={myData}
-                  users={users}
-                  onDelete={handleDeleteMessage}
+          {showHome ? (
+            <>
+              <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>All Committees</span>
+                <input
+                  type="text"
+                  placeholder="Search committees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #4F5D75',
+                    backgroundColor: '#2D3142',
+                    color: 'white',
+                    fontSize: '14px',
+                    width: '250px'
+                  }}
+                  aria-label="Search committees"
                 />
-              ))
-            )}
-          </div>
-          <div className="chat-input-container">
-            {showEmojiPicker && (
-              <div className="emoji-picker-mock" role="menu">
-                <span onClick={() => insertEmoji("🚀")} role="menuitem">🚀</span>
-                <span onClick={() => insertEmoji("🍎")} role="menuitem">🍎</span>
-                <span onClick={() => insertEmoji("💡")} role="menuitem">💡</span>
-                <span onClick={() => insertEmoji("👍")} role="menuitem">👍</span>
-                <span onClick={() => insertEmoji("👎")} role="menuitem">👎</span>
-                <span onClick={() => insertEmoji("✅")} role="menuitem">✅</span>
-                <span onClick={() => insertEmoji("❌")} role="menuitem">❌</span>
-                <span onClick={() => insertEmoji("🎉")} role="menuitem">🎉</span>
               </div>
-            )}
-            <div className="chat-input">
-              <input
-                type="text"
-                placeholder="Type your message..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                disabled={slowMode && !isChair}
-                aria-label="Chat message input"
-              />
-              <button onClick={() => sendMessage()} aria-label="Send message">Send</button>
-              <button onClick={handleEmojiClick} aria-label="Toggle emoji picker">Emoji</button>
-              <button onClick={handleUploadClick} aria-label="Upload image">Upload</button>
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-                aria-hidden="true"
-              />
-            </div>
-          </div>
+              <div className="chat-messages" style={{ padding: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+                  {committeesLoading ? (
+                    <p>Loading committees...</p>
+                  ) : filteredCommittees.length === 0 ? (
+                    <p>{searchQuery ? `No committees found matching "${searchQuery}"` : 'No committees available. Create one to get started!'}</p>
+                  ) : (
+                    filteredCommittees.map((committee) => {
+                      const committeeUsers = users.filter(u => committee.memberIds?.includes(u.userId));
+                      const onlineCount = committeeUsers.filter(u => u.online).length;
+                      return (
+                        <div 
+                          key={committee.id}
+                          onClick={() => handleCommitteeSelect(committee.id)}
+                          style={{
+                            backgroundColor: '#4F5D75',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            border: currentCommitteeId === committee.id ? '2px solid #EF8354' : '2px solid transparent'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <h3 style={{ color: '#EF8354', marginBottom: '10px', fontSize: '18px' }}>{committee.title}</h3>
+                          <p style={{ color: '#BFC0C0', fontSize: '14px', marginBottom: '8px' }}>
+                            Members: {committee.memberIds?.length || 0}
+                          </p>
+                          <p style={{ color: '#BFC0C0', fontSize: '14px' }}>
+                            Online: {onlineCount}/{committee.memberIds?.length || 0}
+                          </p>
+                          {currentCommitteeId === committee.id && (
+                            <p style={{ color: '#EF8354', fontSize: '12px', marginTop: '8px', fontWeight: 'bold' }}>
+                              Currently Selected
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="chat-header">
+                Chat Window - {currentCommittee.title || 'Select a Committee'}
+              </div>
+              <div className="chat-messages" ref={chatRef} role="log" aria-live="polite">
+                {messagesLoading ? (
+                  <div className="loading-messages">Loading messages...</div>
+                ) : (
+                  messages.map((m) => (
+                    <ChatMessage
+                      key={m.id}
+                      m={m}
+                      myData={myData}
+                      users={users}
+                      onDelete={handleDeleteMessage}
+                    />
+                  ))
+                )}
+              </div>
+              <div className="chat-input-container">
+                {showEmojiPicker && (
+                  <div className="emoji-picker-mock" role="menu">
+                    <span onClick={() => insertEmoji("🚀")} role="menuitem">🚀</span>
+                    <span onClick={() => insertEmoji("🍎")} role="menuitem">🍎</span>
+                    <span onClick={() => insertEmoji("💡")} role="menuitem">💡</span>
+                    <span onClick={() => insertEmoji("👍")} role="menuitem">👍</span>
+                    <span onClick={() => insertEmoji("👎")} role="menuitem">👎</span>
+                    <span onClick={() => insertEmoji("✅")} role="menuitem">✅</span>
+                    <span onClick={() => insertEmoji("❌")} role="menuitem">❌</span>
+                    <span onClick={() => insertEmoji("🎉")} role="menuitem">🎉</span>
+                  </div>
+                )}
+                <div className="chat-input">
+                  <input
+                    type="text"
+                    placeholder="Type your message..."
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                    disabled={slowMode && !isChair}
+                    aria-label="Chat message input"
+                  />
+                  <button onClick={() => sendMessage()} aria-label="Send message">Send</button>
+                  <button onClick={handleEmojiClick} aria-label="Toggle emoji picker">Emoji</button>
+                  <button onClick={handleUploadClick} aria-label="Upload image">Upload</button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </section>
         <aside className="motions-section" ref={motionsRef}>
           <h2>Motions & Polls</h2>
