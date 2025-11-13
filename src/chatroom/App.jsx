@@ -10,7 +10,10 @@ import {
   formatTimestamp,
   createCommittee,
   updateCommittee,
+  deleteCommittee,
   addMemberToCommittee,
+  removeMemberFromCommittee,
+  updateMemberPermission,
   createMotion,
   updateMotion,
   addReplyToMotion,
@@ -123,6 +126,8 @@ export default function App() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentCommitteeId, setCurrentCommitteeId] = useState(null);
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
+  const [showHome, setShowHome] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Display-name overrides are stored by Profile.jsx in localStorage.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
@@ -160,7 +165,6 @@ export default function App() {
   const chatRef = useRef(null);
   const motionsRef = useRef(null);
   const newComRef = useRef(null);
-  const addUserRef = useRef(null);
   const fileInputRef = useRef(null);
 
   // Auth0 integration
@@ -204,12 +208,18 @@ export default function App() {
     }
   }, [navigate, auth0Available, isAuthenticated, isLoading, user]);
 
-  // Set default committee
+  // Set default committee and auto-join if not a member
   useEffect(() => {
     if (committees.length > 0 && !currentCommitteeId) {
-      setCurrentCommitteeId(committees[0].id);
+      const firstCommittee = committees[0];
+      setCurrentCommitteeId(firstCommittee.id);
+      
+      // Auto-join the first committee if user is not already a member
+      if (myData.id && !firstCommittee.memberIds?.includes(myData.id)) {
+        addMemberToCommittee(firstCommittee.id, myData.id).catch(console.error);
+      }
     }
-  }, [committees, currentCommitteeId]);
+  }, [committees, currentCommitteeId, myData.id]);
 
   // Create/update user in Firestore on mount
   useEffect(() => {
@@ -223,18 +233,45 @@ export default function App() {
     }
   }, [myData.id, myData.displayName, myData.rank]);
 
-  // Update online status on visibility change
+  // Update online status on visibility change and cleanup
   useEffect(() => {
     if (!myData.id) return;
+    
     const handleVisibility = () => {
       const isOnline = document.visibilityState === 'visible';
       updateUserOnlineStatus(myData.id, isOnline).catch(console.error);
     };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    handleVisibility();
+    const handleBeforeUnload = (e) => {
+      // Use navigator.sendBeacon for more reliable status update on page close
+      // Note: This requires a REST endpoint, so we'll use the regular update
+      // but flag it to not wait for response
+      navigator.sendBeacon && updateUserOnlineStatus(myData.id, false);
+      if (!navigator.sendBeacon) {
+        // Fallback for browsers without sendBeacon
+        updateUserOnlineStatus(myData.id, false);
+      }
+    };
 
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    const handlePageHide = () => {
+      // pagehide is more reliable than beforeunload for setting offline status
+      updateUserOnlineStatus(myData.id, false).catch(console.error);
+    };
+
+    // Set online when component mounts
+    updateUserOnlineStatus(myData.id, true).catch(console.error);
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      // Set offline when component unmounts or user logs out
+      updateUserOnlineStatus(myData.id, false).catch(console.error);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
   }, [myData.id]);
 
   // Auto-scroll chat to bottom
@@ -244,12 +281,19 @@ export default function App() {
     }
   }, [messages.length]);
 
-  const currentCommittee = committees.find((c) => c.id === currentCommitteeId) || { memberIds: [] };
+  const currentCommittee = committees.find((c) => c.id === currentCommitteeId) || { memberIds: [], memberPermissions: {} };
   const currentUsers = users.filter(u => currentCommittee.memberIds?.includes(u.userId));
   const onlineUsers = currentUsers.filter((u) => u.online);
-  const isChair = myData.rank === "Chair";
+  
+  // Get user's permission level in the current committee
+  const myPermissionInCommittee = currentCommittee.memberPermissions?.[myData.id] || 'Member';
+  const isChair = myPermissionInCommittee === 'Chair';
+  
   const availableUsers = users.filter((u) => !currentCommittee.memberIds?.includes(u.userId));
   const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 2); // 50% quorum
+  
+  // Filter committees to only show ones the user is a member of
+  const myCommittees = committees.filter(c => c.memberIds?.includes(myData.id));
 
   // Send message with optional image attachment
   const sendMessage = async (attachment = null) => {
@@ -289,6 +333,9 @@ export default function App() {
       await createCommittee({
         title,
         memberIds: [myData.id],
+        memberPermissions: {
+          [myData.id]: 'Chair' // Creator is automatically Chair
+        }
       });
       newComRef.current.value = "";
     } catch (error) {
@@ -297,27 +344,59 @@ export default function App() {
     }
   };
 
-  const addUserToCommittee = async () => {
-    const userId = addUserRef.current.value;
-    if (!userId) return;
+  const leaveCommittee = async () => {
+    if (!currentCommitteeId) return;
+    
+    const memberCount = currentCommittee.memberIds?.length || 0;
+    const isLastMember = memberCount === 1;
+    
+    const confirmMessage = isLastMember 
+      ? `You are the last member of "${currentCommittee.title}". Leaving will delete this committee. Are you sure?`
+      : `Are you sure you want to leave "${currentCommittee.title}"?`;
+    
+    if (!window.confirm(confirmMessage)) return;
 
     try {
-      await addMemberToCommittee(currentCommitteeId, userId);
+      if (isLastMember) {
+        // Delete the committee if this is the last member
+        await deleteCommittee(currentCommitteeId);
+      } else {
+        // Just remove the member
+        await removeMemberFromCommittee(currentCommitteeId, myData.id);
+      }
+      
+      // Switch to another committee or home view
+      const remainingCommittees = myCommittees.filter(c => c.id !== currentCommitteeId);
+      if (remainingCommittees.length > 0) {
+        setCurrentCommitteeId(remainingCommittees[0].id);
+      } else {
+        setCurrentCommitteeId(null);
+        setShowHome(true);
+      }
     } catch (error) {
-      console.error('Error adding user to committee:', error);
-      alert('Failed to add user to committee.');
+      console.error('Error leaving committee:', error);
+      alert('Failed to leave committee.');
     }
   };
 
-  const changeUserRank = async (userId, newRank) => {
+  const changeUserRank = async (userId, newPermission) => {
     try {
-      await updateUserRank(userId, newRank);
-      if (userId === myData.id) {
-        setMyData(prev => ({ ...prev, rank: newRank }));
+      // Prevent chair from demoting themselves if they're the only chair
+      if (userId === myData.id && newPermission !== 'Chair') {
+        const chairs = Object.entries(currentCommittee.memberPermissions || {})
+          .filter(([id, perm]) => perm === 'Chair');
+        
+        if (chairs.length === 1) {
+          alert('You cannot demote yourself. You are the only Chair in this committee. Please promote another member to Chair first.');
+          return;
+        }
       }
+      
+      // Update permission in the current committee only
+      await updateMemberPermission(currentCommitteeId, userId, newPermission);
     } catch (error) {
-      console.error('Error changing user rank:', error);
-      alert('Failed to change user rank.');
+      console.error('Error changing user permission:', error);
+      alert('Failed to change user permission.');
     }
   };
 
@@ -550,9 +629,9 @@ export default function App() {
   }
 };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (myData.id) {
-      updateUserOnlineStatus(myData.id, false).catch(console.error);
+      await updateUserOnlineStatus(myData.id, false).catch(console.error);
     }
     localStorage.removeItem('auth0_token');
     localStorage.removeItem('auth0_user');
@@ -572,6 +651,23 @@ export default function App() {
   const activeMotions = motions.filter(m => !m.recorded);
   const pastDecisions = motions.filter(m => m.recorded);
 
+  const handleCommitteeSelect = (committeeId) => {
+    const selectedCommittee = committees.find(c => c.id === committeeId);
+    
+    // Auto-join committee if not already a member
+    if (myData.id && selectedCommittee && !selectedCommittee.memberIds?.includes(myData.id)) {
+      addMemberToCommittee(committeeId, myData.id).catch(console.error);
+    }
+    
+    setCurrentCommitteeId(committeeId);
+    setShowHome(false);
+  };
+
+  // Filter committees based on search query
+  const filteredCommittees = committees.filter(committee =>
+    committee.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="dashboard" role="main">
       <header>
@@ -580,6 +676,7 @@ export default function App() {
           <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
+          <button onClick={() => setShowHome(true)} aria-label="Go to home">Home</button>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
           <button className="logout-btn" onClick={handleLogout} aria-label="Log out">Logout</button>
         </div>
@@ -589,39 +686,29 @@ export default function App() {
           <h2>Online Users ({onlineUsers.length}/{currentUsers.length})</h2>
           <p>Quorum: {quorumMet ? 'Met' : 'Not Met'}</p>
           <ul className="online-users" role="list">
-            {onlineUsers.map((user) => (
-              <li key={user.id}>
-                <div className="avatar" aria-hidden="true"></div>
-                <span>{user.name} ({user.rank || 'Member'})</span>
-                <span className="status">{user.online ? "Online" : "Offline"}</span>
-                {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
-                {isChair && (
-                  <select
-                    value={user.rank || 'Member'}
-                    onChange={(e) => changeUserRank(user.userId, e.target.value)}
-                    aria-label={`Change rank for ${user.name}`}
-                  >
-                    <option>Chair</option>
-                    <option>Member</option>
-                    <option>Observer</option>
-                  </select>
-                )}
-              </li>
-            ))}
+            {onlineUsers.map((user) => {
+              const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
+              return (
+                <li key={user.id}>
+                  <div className="avatar" aria-hidden="true"></div>
+                  <span>{user.name} ({userPermission})</span>
+                  <span className="status">{user.online ? "Online" : "Offline"}</span>
+                  {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
+                  {isChair && (
+                    <select
+                      value={userPermission}
+                      onChange={(e) => changeUserRank(user.userId, e.target.value)}
+                      aria-label={`Change permission for ${user.name}`}
+                    >
+                      <option>Chair</option>
+                      <option>Member</option>
+                      <option>Observer</option>
+                    </select>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-          {isChair && availableUsers.length > 0 && (
-            <div className="add-user">
-              <select ref={addUserRef} aria-label="Select user to add">
-                <option value="">Select user...</option>
-                {availableUsers.map((u) => (
-                  <option key={u.id} value={u.userId}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-              <button onClick={addUserToCommittee}>Add to Committee</button>
-            </div>
-          )}
           <div className="committees">
             <h2>Committees</h2>
             <input ref={newComRef} placeholder="New Committee Title" aria-label="New committee title" />
@@ -630,14 +717,14 @@ export default function App() {
               <p>Loading committees...</p>
             ) : (
               <ul role="list">
-                {committees.map((com) => (
+                {myCommittees.map((com) => (
                   <li
                     key={com.id}
                     className={com.id === currentCommitteeId ? "active" : ""}
-                    onClick={() => setCurrentCommitteeId(com.id)}
+                    onClick={() => handleCommitteeSelect(com.id)}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && setCurrentCommitteeId(com.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCommitteeSelect(com.id)}
                   >
                     {com.title}
                   </li>
@@ -647,60 +734,152 @@ export default function App() {
           </div>
         </aside>
         <section className="chat-section">
-          <div className="chat-header">
-            Chat Window - {currentCommittee.title || 'Select a Committee'}
-          </div>
-          <div className="chat-messages" ref={chatRef} role="log" aria-live="polite">
-            {messagesLoading ? (
-              <div className="loading-messages">Loading messages...</div>
-            ) : (
-              messages.map((m) => (
-                <ChatMessage
-                  key={m.id}
-                  m={m}
-                  myData={myData}
-                  users={users}
-                  onDelete={handleDeleteMessage}
+          {showHome ? (
+            <>
+              <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>All Committees</span>
+                <input
+                  type="text"
+                  placeholder="Search committees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #4F5D75',
+                    backgroundColor: '#2D3142',
+                    color: 'white',
+                    fontSize: '14px',
+                    width: '250px'
+                  }}
+                  aria-label="Search committees"
                 />
-              ))
-            )}
-          </div>
-          <div className="chat-input-container">
-            {showEmojiPicker && (
-              <div className="emoji-picker-mock" role="menu">
-                <span onClick={() => insertEmoji("🚀")} role="menuitem">🚀</span>
-                <span onClick={() => insertEmoji("🍎")} role="menuitem">🍎</span>
-                <span onClick={() => insertEmoji("💡")} role="menuitem">💡</span>
-                <span onClick={() => insertEmoji("👍")} role="menuitem">👍</span>
-                <span onClick={() => insertEmoji("👎")} role="menuitem">👎</span>
-                <span onClick={() => insertEmoji("✅")} role="menuitem">✅</span>
-                <span onClick={() => insertEmoji("❌")} role="menuitem">❌</span>
-                <span onClick={() => insertEmoji("🎉")} role="menuitem">🎉</span>
               </div>
-            )}
-            <div className="chat-input">
-              <input
-                type="text"
-                placeholder="Type your message..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                disabled={slowMode && !isChair}
-                aria-label="Chat message input"
-              />
-              <button onClick={() => sendMessage()} aria-label="Send message">Send</button>
-              <button onClick={handleEmojiClick} aria-label="Toggle emoji picker">Emoji</button>
-              <button onClick={handleUploadClick} aria-label="Upload image">Upload</button>
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-                aria-hidden="true"
-              />
-            </div>
-          </div>
+              <div className="chat-messages" style={{ padding: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
+                  {committeesLoading ? (
+                    <p>Loading committees...</p>
+                  ) : filteredCommittees.length === 0 ? (
+                    <p>{searchQuery ? `No committees found matching "${searchQuery}"` : 'No committees available. Create one to get started!'}</p>
+                  ) : (
+                    filteredCommittees.map((committee) => {
+                      const committeeUsers = users.filter(u => committee.memberIds?.includes(u.userId));
+                      const onlineCount = committeeUsers.filter(u => u.online).length;
+                      return (
+                        <div 
+                          key={committee.id}
+                          onClick={() => handleCommitteeSelect(committee.id)}
+                          style={{
+                            backgroundColor: '#4F5D75',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            border: currentCommitteeId === committee.id ? '2px solid #EF8354' : '2px solid transparent'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <h3 style={{ color: '#EF8354', marginBottom: '10px', fontSize: '18px' }}>{committee.title}</h3>
+                          <p style={{ color: '#BFC0C0', fontSize: '14px', marginBottom: '8px' }}>
+                            Members: {committee.memberIds?.length || 0}
+                          </p>
+                          <p style={{ color: '#BFC0C0', fontSize: '14px' }}>
+                            Online: {onlineCount}/{committee.memberIds?.length || 0}
+                          </p>
+                          {currentCommitteeId === committee.id && (
+                            <p style={{ color: '#EF8354', fontSize: '12px', marginTop: '8px', fontWeight: 'bold' }}>
+                              Currently Selected
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Chat Window - {currentCommittee.title || 'Select a Committee'}</span>
+                {currentCommitteeId && (
+                  <button
+                    onClick={leaveCommittee}
+                    style={{
+                      backgroundColor: '#EF8354',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    aria-label="Leave committee"
+                  >
+                    Leave Committee
+                  </button>
+                )}
+              </div>
+              <div className="chat-messages" ref={chatRef} role="log" aria-live="polite">
+                {messagesLoading ? (
+                  <div className="loading-messages">Loading messages...</div>
+                ) : (
+                  messages.map((m) => (
+                    <ChatMessage
+                      key={m.id}
+                      m={m}
+                      myData={myData}
+                      users={users}
+                      onDelete={handleDeleteMessage}
+                    />
+                  ))
+                )}
+              </div>
+              <div className="chat-input-container">
+                {showEmojiPicker && (
+                  <div className="emoji-picker-mock" role="menu">
+                    <span onClick={() => insertEmoji("🚀")} role="menuitem">🚀</span>
+                    <span onClick={() => insertEmoji("🍎")} role="menuitem">🍎</span>
+                    <span onClick={() => insertEmoji("💡")} role="menuitem">💡</span>
+                    <span onClick={() => insertEmoji("👍")} role="menuitem">👍</span>
+                    <span onClick={() => insertEmoji("👎")} role="menuitem">👎</span>
+                    <span onClick={() => insertEmoji("✅")} role="menuitem">✅</span>
+                    <span onClick={() => insertEmoji("❌")} role="menuitem">❌</span>
+                    <span onClick={() => insertEmoji("🎉")} role="menuitem">🎉</span>
+                  </div>
+                )}
+                <div className="chat-input">
+                  <input
+                    type="text"
+                    placeholder="Type your message..."
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                    disabled={slowMode && !isChair}
+                    aria-label="Chat message input"
+                  />
+                  <button onClick={() => sendMessage()} aria-label="Send message">Send</button>
+                  <button onClick={handleEmojiClick} aria-label="Toggle emoji picker">Emoji</button>
+                  <button onClick={handleUploadClick} aria-label="Upload image">Upload</button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </section>
         <aside className="motions-section" ref={motionsRef}>
           <h2>Motions & Polls</h2>
