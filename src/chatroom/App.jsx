@@ -32,9 +32,11 @@ const motionStatusNames = ["Pending Second", "In Discussion...", "Voting...", "C
 
 
 // Helper component for displaying messages with attachments
-const ChatMessage = ({ m, myData, users, onDelete }) => {
+const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
   const isMine = m.userId === myData.id || m.id === myData.id;
-  const sender = users.find((u) => u.userId === m.id || u.userId === m.userId)?.name || m.userName || "Unknown";
+  const senderObj = users.find((u) => u.userId === m.userId || u.userId === m.id);
+  const sender = senderObj?.name || m.userName || "Unknown";
+  const senderImage = getImageFor(m.userId || m.id, senderObj?.photoURL || 'placeholder-avatar.png');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Validate Base64 string to prevent XSS
@@ -43,65 +45,110 @@ const ChatMessage = ({ m, myData, users, onDelete }) => {
   };
 
   return (
-    <div 
-      className={`max-w-[70%] p-3 rounded-lg relative mb-6 ${
-        isMine 
-          ? 'self-end bg-accent text-white shadow-message-right' 
-          : 'self-start bg-secondary text-primary shadow-message-left'
-      }`} 
-      role="listitem"
-    >
-      <div className="text-xs font-bold mb-1">{sender}</div>
-      {m.attachment && isValidBase64Image(m.attachment.base64) ? (
-        <div className="flex flex-col">
-          <p className="text-sm font-semibold mb-2">🖼️ Image Attachment</p>
-          <div className="w-full max-w-[150px] bg-primary border border-accent rounded overflow-hidden">
-            <img
-              src={m.attachment.base64}
-              alt={m.attachment.name || "Attachment"}
-              className="w-full h-full object-contain max-h-[100px] cursor-pointer"
-              onClick={() => setIsPreviewOpen(true)}
-              aria-label="Click to preview image"
-            />
-            {isPreviewOpen && (
-              <div 
-                className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50"
-                onClick={() => setIsPreviewOpen(false)}
-              >
+    <div className={`w-full mb-6 flex ${isMine ? 'justify-end' : 'justify-start'}`} role="listitem">
+      <div className={`flex items-start ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+        {/* Avatar */}
+        <button
+          onClick={() => {
+            const userObj = senderObj || { userId: m.userId || m.id, name: sender, photoURL: senderObj?.photoURL || senderImage, bio: m.userBio || m.bio };
+            onShowProfile && onShowProfile(userObj);
+          }}
+          className="p-0 border-0 bg-transparent cursor-pointer mr-3 ml-3"
+          aria-label={`View profile for ${sender}`}
+        >
+          <img
+            src={senderImage}
+            alt={`${sender}'s avatar`}
+            className="w-8 h-8 rounded-full object-cover"
+          />
+        </button>
+
+        <div 
+          className={`max-w-[70%] p-3 rounded-lg relative ${
+            isMine 
+              ? 'bg-accent text-white shadow-message-right' 
+              : 'bg-secondary text-primary shadow-message-left'
+          }`}
+        >
+          <div className="text-xs font-bold mb-1">
+            <button
+              onClick={() => {
+                const userObj = senderObj || { userId: m.userId || m.id, name: sender, photoURL: senderObj?.photoURL || senderImage, bio: m.userBio || m.bio };
+                onShowProfile && onShowProfile(userObj);
+              }}
+              className="p-0 border-0 bg-transparent text-left text-inherit cursor-pointer"
+              aria-label={`View profile for ${sender}`}
+            >
+              {sender}
+            </button>
+          </div>
+          {m.attachment && isValidBase64Image(m.attachment.base64) ? (
+            <div className="flex flex-col">
+              <p className="text-sm font-semibold mb-2">🖼️ Image Attachment</p>
+              <div className="w-full max-w-[150px] bg-primary border border-accent rounded overflow-hidden">
                 <img
                   src={m.attachment.base64}
-                  alt="Full-size attachment"
-                  className="max-w-[90%] max-h-[90%] rounded-lg object-contain"
+                  alt={m.attachment.name || "Attachment"}
+                  className="w-full h-full object-contain max-h-[100px] cursor-pointer"
+                  onClick={() => setIsPreviewOpen(true)}
+                  aria-label="Click to preview image"
                 />
+                {isPreviewOpen && (
+                  <div 
+                    className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50"
+                    onClick={() => setIsPreviewOpen(false)}
+                  >
+                    <img
+                      src={m.attachment.base64}
+                      alt="Full-size attachment"
+                      className="max-w-[90%] max-h-[90%] rounded-lg object-contain"
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          {m.text && <p className="mt-2 text-sm italic">{m.text}</p>}
+              {m.text && <p className="mt-2 text-sm italic">{m.text}</p>}
+            </div>
+          ) : m.attachment ? (
+            <div className="flex flex-col">
+              <p>Invalid or unsupported image attachment</p>
+              <p className="text-xs opacity-75 mt-1">
+                {m.attachment.name}
+              </p>
+            </div>
+          ) : (
+            <div className="text-sm">{m.msg || m.text}</div>
+          )}
+          <span className="text-xs text-gray-500 absolute -bottom-5 right-2 whitespace-nowrap overflow-visible max-w-none" style={{whiteSpace: 'nowrap'}} title={m.createdAt ? formatTimestamp(m.createdAt) : m.time}>
+            {m.createdAt ? formatTimestamp(m.createdAt) : m.time}
+          </span>
+          {isMine && onDelete && (
+            <button
+              className="absolute top-1 right-1 bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm leading-none p-0 transition-colors"
+              onClick={() => onDelete(m.id)}
+              aria-label="Delete message"
+            >
+              ×
+            </button>
+          )}
         </div>
-      ) : m.attachment ? (
-        <div className="flex flex-col">
-          <p>Invalid or unsupported image attachment</p>
-          <p className="text-xs opacity-75 mt-1">
-            {m.attachment.name}
-          </p>
-        </div>
-      ) : (
-        <div className="text-sm">{m.msg || m.text}</div>
-      )}
-      <span className="text-xs text-gray-500 absolute -bottom-5 right-2">
-        {m.createdAt ? formatTimestamp(m.createdAt) : m.time}
-      </span>
-      {isMine && onDelete && (
-        <button
-          className="absolute top-1 right-1 bg-red-700 bg-opacity-70 hover:bg-opacity-90 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm leading-none p-0 transition-colors"
-          onClick={() => onDelete(m.id)}
-          aria-label="Delete message"
-        >
-          ×
-        </button>
-      )}
+      </div>
     </div>
   );
+};
+
+// Image override helpers (moved to module scope so components above can use them)
+const IMAGE_OVERRIDES_KEY = 'profile_img_overrides';
+const readImageOverrides = () => {
+  try {
+    const raw = localStorage.getItem(IMAGE_OVERRIDES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+};
+const getImageFor = (id, fallback) => {
+  const map = readImageOverrides();
+  return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
 };
 
 // Component for motion history log
@@ -143,19 +190,6 @@ export default function App() {
     const map = readDisplayOverrides();
     return (id && map[id]) || (fallback && map[fallback]) || fallback || 'User';
   };
-  const IMAGE_OVERRIDES_KEY = 'profile_img_overrides';
-  const readImageOverrides = () => {
-    try {
-      const raw = localStorage.getItem(IMAGE_OVERRIDES_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch (e) {
-      return {};
-    }
-  };
-  const getImageFor = (id, fallback) => {
-    const map = readImageOverrides();
-    return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
-  };
 
   // Firestore hooks
   const { committees, loading: committeesLoading } = useCommittees();
@@ -166,6 +200,7 @@ export default function App() {
   const motionsRef = useRef(null);
   const newComRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   // Auth0 integration
   let auth0Available = false;
@@ -670,13 +705,21 @@ export default function App() {
 
   return (
     <div className="dashboard" role="main">
-      <header>
-        <h1>Committee Dashboard</h1>
-        <div className="user-profile">
-          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" />
+      <header className="flex items-center justify-between p-3">
+        <div className="flex items-center space-x-3">
+          <h1 className="text-lg font-semibold">Committee Dashboard</h1>
+          <button
+            onClick={() => setShowHome(true)}
+            aria-label="Go to home"
+            className="px-2 py-1 rounded bg-accent text-white text-sm"
+          >
+            Home
+          </button>
+        </div>
+        <div className="user-profile flex items-center space-x-3">
+          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
-          <button onClick={() => setShowHome(true)} aria-label="Go to home">Home</button>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
           <button className="logout-btn" onClick={handleLogout} aria-label="Log out">Logout</button>
         </div>
@@ -688,11 +731,21 @@ export default function App() {
           <ul className="online-users" role="list">
             {onlineUsers.map((user) => {
               const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
+              const avatarSrc = getImageFor(user.userId, user.photoURL || 'placeholder-avatar.png');
               return (
-                <li key={user.id}>
-                  <div className="avatar" aria-hidden="true"></div>
-                  <span>{user.name} ({userPermission})</span>
-                  <span className="status">{user.online ? "Online" : "Offline"}</span>
+                            <li key={user.id} className="flex items-center space-x-2">
+                              <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
+                                <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className="w-8 h-8 rounded-full object-cover" />
+                              </button>
+                              <div className="flex-1">
+                                <div className="font-semibold text-sm">
+                                  <button onClick={() => setSelectedUser(user)} className="text-left p-0 m-0 border-0 bg-transparent text-inherit cursor-pointer">
+                                    {user.name}
+                                  </button>
+                                  <span className="text-xs opacity-75"> ({userPermission})</span>
+                                </div>
+                                <div className="text-xs text-gray-400">{user.online ? "Online" : "Offline"}</div>
+                              </div>
                   {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
                   {isChair && (
                     <select
@@ -832,13 +885,14 @@ export default function App() {
                   <div className="loading-messages">Loading messages...</div>
                 ) : (
                   messages.map((m) => (
-                    <ChatMessage
-                      key={m.id}
-                      m={m}
-                      myData={myData}
-                      users={users}
-                      onDelete={handleDeleteMessage}
-                    />
+                      <ChatMessage
+                        key={m.id}
+                        m={m}
+                        myData={myData}
+                        users={users}
+                        onDelete={handleDeleteMessage}
+                        onShowProfile={setSelectedUser}
+                      />
                   ))
                 )}
               </div>
@@ -1062,6 +1116,40 @@ export default function App() {
             );
           })}
         </aside>
+        {/* User Profile Modal */}
+        {selectedUser && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setSelectedUser(null)}
+          >
+            <div className="absolute inset-0 bg-black opacity-50"></div>
+            <div
+              className="relative bg-primary rounded-card p-6 w-full max-w-md z-60 shadow-card"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center space-x-4 mb-4">
+                <img src={getImageFor(selectedUser.userId, selectedUser.photoURL || 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                <div>
+                  <h3 className="text-white text-lg font-bold">{selectedUser.name || selectedUser.userId}</h3>
+                  <div className="text-xs text-gray-400">{selectedUser.online ? 'Online' : 'Offline'}</div>
+                </div>
+                <button onClick={() => setSelectedUser(null)} aria-label="Close" className="ml-auto text-white">✕</button>
+              </div>
+              <div className="text-sm text-secondary">
+                {(() => {
+                  try {
+                    const bioMap = JSON.parse(localStorage.getItem('profile_bio_overrides') || '{}');
+                    return bioMap[selectedUser.userId] || selectedUser.bio || 'No bio available.';
+                  } catch (e) {
+                    return selectedUser.bio || 'No bio available.';
+                  }
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
