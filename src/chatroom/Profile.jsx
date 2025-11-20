@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
+import { createOrUpdateUser } from '../firebase/firestoreService';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -146,6 +147,12 @@ export default function ProfilePage() {
       const username = user.username;
       setOverride(IMAGE_OVERRIDES_KEY, username, dataUrl);
       setUser({ ...user, img: dataUrl });
+      // Persist image to Firestore so other clients can see it
+      try {
+        createOrUpdateUser({ userId: username, img: dataUrl }).catch(console.error);
+      } catch (err) {
+        console.error('Failed to persist user image to Firestore', err);
+      }
     };
     reader.onerror = () => {
       console.error('Failed to read image file');
@@ -161,6 +168,12 @@ export default function ProfilePage() {
     setOverride(IMAGE_OVERRIDES_KEY, username, url);
     setUser({ ...user, img: url });
     setChangeImgVal('');
+    // Persist image URL to Firestore so other clients can see it
+    try {
+      createOrUpdateUser({ userId: username, img: url }).catch(console.error);
+    } catch (err) {
+      console.error('Failed to persist image URL to Firestore', err);
+    }
   };
 
   const handleChangeBio = () => {
