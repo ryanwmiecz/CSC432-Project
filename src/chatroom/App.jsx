@@ -36,7 +36,7 @@ const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
   const isMine = m.userId === myData.id || m.id === myData.id;
   const senderObj = users.find((u) => u.userId === m.userId || u.userId === m.id);
   const sender = senderObj?.name || m.userName || "Unknown";
-  const senderImage = getImageFor(m.userId || m.id, senderObj?.photoURL || 'placeholder-avatar.png');
+  const senderImage = resolveUserImage(senderObj || { userId: m.userId || m.id, photoURL: m.userPhoto || m.photoURL || m.photo }, 'placeholder-avatar.png');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Validate Base64 string to prevent XSS
@@ -149,6 +149,14 @@ const readImageOverrides = () => {
 const getImageFor = (id, fallback) => {
   const map = readImageOverrides();
   return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
+};
+
+// Resolve a user's image by checking common fields then local overrides
+const resolveUserImage = (userObj, fallback = 'placeholder-avatar.png') => {
+  if (!userObj) return fallback;
+  const id = userObj.userId || userObj.id || userObj.username || userObj.userId;
+  const url = userObj.photoURL || userObj.photoUrl || userObj.picture || userObj.img || userObj.avatar || userObj.image;
+  return getImageFor(id, url || fallback);
 };
 
 // Component for motion history log
@@ -717,7 +725,7 @@ export default function App() {
           </button>
         </div>
         <div className="user-profile flex items-center space-x-3">
-          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+          <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
@@ -731,7 +739,7 @@ export default function App() {
           <ul className="online-users" role="list">
             {onlineUsers.map((user) => {
               const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
-              const avatarSrc = getImageFor(user.userId, user.photoURL || 'placeholder-avatar.png');
+              const avatarSrc = resolveUserImage(user, 'placeholder-avatar.png');
               return (
                             <li key={user.id} className="flex items-center space-x-2">
                               <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
@@ -1130,7 +1138,7 @@ export default function App() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center space-x-4 mb-4">
-                <img src={getImageFor(selectedUser.userId, selectedUser.photoURL || 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                <img src={resolveUserImage(selectedUser, 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
                 <div>
                   <h3 className="text-white text-lg font-bold">{selectedUser.name || selectedUser.userId}</h3>
                   <div className="text-xs text-gray-400">{selectedUser.online ? 'Online' : 'Offline'}</div>
