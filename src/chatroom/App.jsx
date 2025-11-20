@@ -22,7 +22,7 @@ import {
   updateUserRank,
   updateUserOnlineStatus,
 } from '../firebase/firestoreService';
-import { FIREBASE_PROJECT_ID } from '../firebase/config';
+// (Removed visible Firebase project label import — debug output moved out of UI)
 
 // Motion status constants (Robert's Rules of Order)
 const STATUS_PENDING = 0; // New: Pending second
@@ -734,14 +734,7 @@ export default function App() {
             Home
           </button>
         </div>
-        {/* Firebase project indicator for debugging Netlify vs local Firestore */}
-        <div className="flex-1 text-center">
-          {FIREBASE_PROJECT_ID ? (
-            <div className="text-xs text-gray-300">Firebase project: <span className="font-mono">{FIREBASE_PROJECT_ID}</span></div>
-          ) : (
-            <div className="text-xs text-red-400">Firebase project: not configured (check VITE_FIREBASE_* env vars)</div>
-          )}
-        </div>
+        {/* Firebase project indicator removed from UI (kept console debug in config) */}
         <div className="user-profile flex items-center space-x-3">
           <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
           <span>{myData.displayName}</span>
