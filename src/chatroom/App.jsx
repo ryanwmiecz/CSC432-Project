@@ -22,6 +22,7 @@ import {
   updateUserRank,
   updateUserOnlineStatus,
 } from '../firebase/firestoreService';
+// (Removed visible Firebase project label import — debug output moved out of UI)
 
 // Motion status constants (Robert's Rules of Order)
 const STATUS_PENDING = 0; // New: Pending second
@@ -36,7 +37,7 @@ const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
   const isMine = m.userId === myData.id || m.id === myData.id;
   const senderObj = users.find((u) => u.userId === m.userId || u.userId === m.id);
   const sender = senderObj?.name || m.userName || "Unknown";
-  const senderImage = getImageFor(m.userId || m.id, senderObj?.photoURL || 'placeholder-avatar.png');
+  const senderImage = resolveUserImage(senderObj || { userId: m.userId || m.id, photoURL: m.userPhoto || m.photoURL || m.photo }, 'placeholder-avatar.png');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Validate Base64 string to prevent XSS
@@ -149,6 +150,14 @@ const readImageOverrides = () => {
 const getImageFor = (id, fallback) => {
   const map = readImageOverrides();
   return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
+};
+
+// Resolve a user's image by checking common fields then local overrides
+const resolveUserImage = (userObj, fallback = 'placeholder-avatar.png') => {
+  if (!userObj) return fallback;
+  const id = userObj.userId || userObj.id || userObj.username || userObj.userId;
+  const url = userObj.photoURL || userObj.photoUrl || userObj.picture || userObj.img || userObj.avatar || userObj.image;
+  return getImageFor(id, url || fallback);
 };
 
 // Component for motion history log
@@ -267,6 +276,15 @@ export default function App() {
       }).catch(console.error);
     }
   }, [myData.id, myData.displayName, myData.rank]);
+
+  // When the users list updates, prefer the Firestore-stored name for the current user
+  useEffect(() => {
+    if (!myData.id || !users || users.length === 0) return;
+    const me = users.find(u => u.userId === myData.id);
+    if (me && me.name && me.name !== myData.displayName) {
+      setMyData(prev => ({ ...prev, displayName: me.name }));
+    }
+  }, [users, myData.id]);
 
   // Update online status on visibility change and cleanup
   useEffect(() => {
@@ -716,8 +734,9 @@ export default function App() {
             Home
           </button>
         </div>
+        {/* Firebase project indicator removed from UI (kept console debug in config) */}
         <div className="user-profile flex items-center space-x-3">
-          <img src={getImageFor(myData.id, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+          <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
@@ -726,26 +745,28 @@ export default function App() {
       </header>
       <main className="flex flex-1 overflow-hidden">
         <aside className="sidebar">
-          <h2>Online Users ({onlineUsers.length}/{currentUsers.length})</h2>
+          <h2>Members ({onlineUsers.length}/{currentUsers.length})</h2>
           <p>Quorum: {quorumMet ? 'Met' : 'Not Met'}</p>
-          <ul className="online-users" role="list">
-            {onlineUsers.map((user) => {
+          <div className="members-list-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+            <ul className="online-users" role="list">
+            {currentUsers.map((user) => {
               const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
-              const avatarSrc = getImageFor(user.userId, user.photoURL || 'placeholder-avatar.png');
+              const avatarSrc = resolveUserImage(user, 'placeholder-avatar.png');
+              const isOnline = !!user.online;
               return (
-                            <li key={user.id} className="flex items-center space-x-2">
-                              <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
-                                <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className="w-8 h-8 rounded-full object-cover" />
-                              </button>
-                              <div className="flex-1">
-                                <div className="font-semibold text-sm">
-                                  <button onClick={() => setSelectedUser(user)} className="text-left p-0 m-0 border-0 bg-transparent text-inherit cursor-pointer">
-                                    {user.name}
-                                  </button>
-                                  <span className="text-xs opacity-75"> ({userPermission})</span>
-                                </div>
-                                <div className="text-xs text-gray-400">{user.online ? "Online" : "Offline"}</div>
-                              </div>
+                <li key={user.id} className={`flex items-center space-x-2 ${isOnline ? '' : 'opacity-60'}`}>
+                  <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
+                    <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className={`w-8 h-8 rounded-full object-cover ${isOnline ? '' : 'grayscale'}`} />
+                  </button>
+                  <div className="flex-1">
+                    <div className={`font-semibold text-sm ${isOnline ? '' : 'text-gray-400'}`}>
+                      <button onClick={() => setSelectedUser(user)} className="text-left p-0 m-0 border-0 bg-transparent text-inherit cursor-pointer">
+                        {user.name}
+                      </button>
+                      <span className="text-xs opacity-75"> ({userPermission})</span>
+                    </div>
+                    <div className="text-xs" aria-live="polite">{isOnline ? 'Online' : 'Offline'}</div>
+                  </div>
                   {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
                   {isChair && (
                     <select
@@ -761,7 +782,8 @@ export default function App() {
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </div>
           <div className="committees">
             <h2>Committees</h2>
             <input ref={newComRef} placeholder="New Committee Title" aria-label="New committee title" />
@@ -1130,7 +1152,7 @@ export default function App() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center space-x-4 mb-4">
-                <img src={getImageFor(selectedUser.userId, selectedUser.photoURL || 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                <img src={resolveUserImage(selectedUser, 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
                 <div>
                   <h3 className="text-white text-lg font-bold">{selectedUser.name || selectedUser.userId}</h3>
                   <div className="text-xs text-gray-400">{selectedUser.online ? 'Online' : 'Offline'}</div>

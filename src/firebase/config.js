@@ -24,3 +24,16 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 
 export default app;
+
+// Helpful debug export: expose the projectId so UI can display it for troubleshooting
+export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
+
+// Log project id at startup to help locate which project is in use (dev/preview mismatch)
+try {
+  // Log only the project id to avoid leaking secrets in console unnecessarily
+  // This helps detect when Netlify preview points to a different Firestore project.
+  // eslint-disable-next-line no-console
+  console.info('[Firebase] projectId:', firebaseConfig.projectId);
+} catch (e) {
+  // ignore
+}
