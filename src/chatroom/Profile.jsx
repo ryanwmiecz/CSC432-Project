@@ -132,6 +132,12 @@ export default function ProfilePage() {
     setOverride(DISPLAY_OVERRIDES_KEY, username, newName);
     setUser({ ...user, displayName: newName });
     setChangeNameVal('');
+    // Persist display name to Firestore so other clients and new sessions retain it
+    try {
+      createOrUpdateUser({ userId: username, name: newName }).catch(console.error);
+    } catch (err) {
+      console.error('Failed to persist display name to Firestore', err);
+    }
   };
 
   const handleImageFile = (e) => {
@@ -190,6 +196,12 @@ export default function ProfilePage() {
       setUser({ ...user, bio: newBio });
     }
     setChangeBioVal('');
+    // Persist bio to Firestore so it remains after new PRs / sessions
+    try {
+      createOrUpdateUser({ userId: username, bio: newBio }).catch(console.error);
+    } catch (err) {
+      console.error('Failed to persist bio to Firestore', err);
+    }
   };
 
   const handleBack = () => {

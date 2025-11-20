@@ -276,6 +276,15 @@ export default function App() {
     }
   }, [myData.id, myData.displayName, myData.rank]);
 
+  // When the users list updates, prefer the Firestore-stored name for the current user
+  useEffect(() => {
+    if (!myData.id || !users || users.length === 0) return;
+    const me = users.find(u => u.userId === myData.id);
+    if (me && me.name && me.name !== myData.displayName) {
+      setMyData(prev => ({ ...prev, displayName: me.name }));
+    }
+  }, [users, myData.id]);
+
   // Update online status on visibility change and cleanup
   useEffect(() => {
     if (!myData.id) return;
@@ -734,26 +743,27 @@ export default function App() {
       </header>
       <main className="flex flex-1 overflow-hidden">
         <aside className="sidebar">
-          <h2>Online Users ({onlineUsers.length}/{currentUsers.length})</h2>
+          <h2>Members ({onlineUsers.length}/{currentUsers.length})</h2>
           <p>Quorum: {quorumMet ? 'Met' : 'Not Met'}</p>
           <ul className="online-users" role="list">
-            {onlineUsers.map((user) => {
+            {currentUsers.map((user) => {
               const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
               const avatarSrc = resolveUserImage(user, 'placeholder-avatar.png');
+              const isOnline = !!user.online;
               return (
-                            <li key={user.id} className="flex items-center space-x-2">
-                              <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
-                                <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className="w-8 h-8 rounded-full object-cover" />
-                              </button>
-                              <div className="flex-1">
-                                <div className="font-semibold text-sm">
-                                  <button onClick={() => setSelectedUser(user)} className="text-left p-0 m-0 border-0 bg-transparent text-inherit cursor-pointer">
-                                    {user.name}
-                                  </button>
-                                  <span className="text-xs opacity-75"> ({userPermission})</span>
-                                </div>
-                                <div className="text-xs text-gray-400">{user.online ? "Online" : "Offline"}</div>
-                              </div>
+                <li key={user.id} className={`flex items-center space-x-2 ${isOnline ? '' : 'opacity-60'}`}>
+                  <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
+                    <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className={`w-8 h-8 rounded-full object-cover ${isOnline ? '' : 'grayscale'}`} />
+                  </button>
+                  <div className="flex-1">
+                    <div className={`font-semibold text-sm ${isOnline ? '' : 'text-gray-400'}`}>
+                      <button onClick={() => setSelectedUser(user)} className="text-left p-0 m-0 border-0 bg-transparent text-inherit cursor-pointer">
+                        {user.name}
+                      </button>
+                      <span className="text-xs opacity-75"> ({userPermission})</span>
+                    </div>
+                    <div className="text-xs" aria-live="polite">{isOnline ? 'Online' : 'Offline'}</div>
+                  </div>
                   {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
                   {isChair && (
                     <select
