@@ -22,6 +22,7 @@ import {
   updateUserRank,
   updateUserOnlineStatus,
 } from '../firebase/firestoreService';
+import { FIREBASE_PROJECT_ID } from '../firebase/config';
 
 // Motion status constants (Robert's Rules of Order)
 const STATUS_PENDING = 0; // New: Pending second
@@ -733,6 +734,14 @@ export default function App() {
             Home
           </button>
         </div>
+        {/* Firebase project indicator for debugging Netlify vs local Firestore */}
+        <div className="flex-1 text-center">
+          {FIREBASE_PROJECT_ID ? (
+            <div className="text-xs text-gray-300">Firebase project: <span className="font-mono">{FIREBASE_PROJECT_ID}</span></div>
+          ) : (
+            <div className="text-xs text-red-400">Firebase project: not configured (check VITE_FIREBASE_* env vars)</div>
+          )}
+        </div>
         <div className="user-profile flex items-center space-x-3">
           <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
           <span>{myData.displayName}</span>
@@ -745,7 +754,8 @@ export default function App() {
         <aside className="sidebar">
           <h2>Members ({onlineUsers.length}/{currentUsers.length})</h2>
           <p>Quorum: {quorumMet ? 'Met' : 'Not Met'}</p>
-          <ul className="online-users" role="list">
+          <div className="members-list-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+            <ul className="online-users" role="list">
             {currentUsers.map((user) => {
               const userPermission = currentCommittee.memberPermissions?.[user.userId] || 'Member';
               const avatarSrc = resolveUserImage(user, 'placeholder-avatar.png');
@@ -779,7 +789,8 @@ export default function App() {
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </div>
           <div className="committees">
             <h2>Committees</h2>
             <input ref={newComRef} placeholder="New Committee Title" aria-label="New committee title" />
