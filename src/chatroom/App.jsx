@@ -453,94 +453,144 @@ export default function App() {
     }
   };
 
-  const secondMotion = async (motionId) => {
-    if (!quorumMet) {
-      alert('Quorum not met. Cannot second motion.');
-      return;
-    }
-    try {
-      await updateMotion(motionId, {
-        status: STATUS_DISCUSSION,
-        history: [{ action: 'Seconded', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-    } catch (error) {
-      console.error('Error seconding motion:', error);
-      alert('Failed to second motion.');
-    }
-  };
+const secondMotion = async (motionId) => {
+  if (!quorumMet) {
+    alert('Quorum not met. Cannot second motion.');
+    return;
+  }
+  try {
+    await updateMotion(motionId, {
+      status: STATUS_DISCUSSION,
+      history: [{
+        action: 'Seconded',
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+    });
+  } catch (error) {
+    console.error('Error seconding motion:', error);
+    alert('Failed to second motion.');
+  }
+};
 
-  const proposeAmendment = async (motionId, e) => {
-    e.preventDefault();
-    const amendmentText = e.target.amendment.value.trim();
-    if (!amendmentText) return;
 
-    try {
-      await addReplyToMotion(motionId, {
-        id: myData.id,
-        name: myData.displayName,
-        msg: `Amendment: ${amendmentText}`,
-        stance: 'amendment',
-      });
-      await updateMotion(motionId, {
-        history: [{ action: 'Proposed Amendment', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-      e.target.reset();
-    } catch (error) {
-      console.error('Error proposing amendment:', error);
-      alert('Failed to propose amendment.');
-    }
-  };
+const proposeAmendment = async (motionId, e) => {
+  e.preventDefault();
+  const amendmentText = e.target.amendment.value.trim();
+  if (!amendmentText) return;
 
-  const callTheQuestion = async (motionId) => {
-    if (!quorumMet) {
-      alert('Quorum not met. Cannot call the question.');
-      return;
-    }
-    if (!window.confirm('Call the question to end discussion and start voting?')) return;
+  try {
+    await addReplyToMotion(motionId, {
+      id: myData.id,
+      name: myData.displayName,
+      msg: `Amendment: ${amendmentText}`,
+      stance: 'amendment',
+    });
+    await updateMotion(motionId, {
+      history: [{
+        action: 'Proposed Amendment',
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+    });
+    e.target.reset();
+  } catch (error) {
+    console.error('Error proposing amendment:', error);
+    alert('Failed to propose amendment.');
+  }
+};
 
-    try {
-      await createMotion({
-        committeeId: currentCommitteeId,
-        title: `Call the Question on Motion`,
-        desc: `End discussion and move to vote on motion ${motionId}`,
-        status: STATUS_VOTING,
-        type: 'procedure',
-        proposedBy: myData.id,
-        proposedByName: myData.displayName,
-        relatedMotionId: motionId,
-      });
-    } catch (error) {
-      console.error('Error calling the question:', error);
-      alert('Failed to call the question.');
-    }
-  };
 
-  const raiseMotion = async (e) => {
-    e.preventDefault();
-    const title = e.target.title.value.trim();
-    const desc = e.target.desc.value.trim();
-    const type = e.target.type.value;
-    const status = STATUS_PENDING; // Motions start as pending
 
-    if (!title || !desc) return;
 
-    try {
-      await createMotion({
-        committeeId: currentCommitteeId,
-        title,
-        desc,
-        status,
-        type,
-        proposedBy: myData.id,
-        proposedByName: myData.displayName,
-        history: [{ action: 'Proposed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-      e.target.reset();
-    } catch (error) {
-      console.error('Error raising motion:', error);
-      alert('Failed to raise motion.');
-    }
-  };
+const callTheQuestion = async (motionId) => {
+  if (!quorumMet) {
+    alert('Quorum not met. Cannot call the question.');
+    return;
+  }
+  if (!window.confirm('Call the question to end discussion and start voting?')) return;
+
+  try {
+    const committeeIdString = String(currentCommitteeId);
+    await createMotion({
+      committeeId: committeeIdString, // Use string version
+      title: `Call the Question on Motion`,
+      desc: `End discussion and move to vote on motion ${motionId}`,
+      status: STATUS_VOTING,
+      type: 'procedure',
+      proposedBy: myData.id,
+      proposedByName: myData.displayName,
+      relatedMotionId: motionId,
+      history: [{
+        action: 'Called the Question',
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+      replies: [],
+      votes: {},
+    });
+  } catch (error) {
+    console.error('Error calling the question:', error);
+    alert('Failed to call the question.');
+  }
+};
+
+
+const raiseMotion = async (e) => {
+  e.preventDefault();
+  const title = e.target.title.value.trim();
+  const desc = e.target.desc.value.trim();
+  const type = e.target.type.value;
+  const status = STATUS_PENDING; // Motions start as pending
+
+  if (!title || !desc) {
+    alert('Please enter both title and description');
+    return;
+  }
+
+  if (!currentCommitteeId) {
+    alert('Please select a committee first');
+    return;
+  }
+
+  try {
+    // Create initial history entry
+    const initialHistory = [{
+      action: 'Proposed',
+      userId: myData.id,
+      userName: myData.displayName,
+      timestamp: new Date()
+    }];
+
+    // Create the motion with all required fields
+    const motionData = {
+      committeeId: currentCommitteeId,
+      title,
+      desc,
+      status,
+      type,
+      proposedBy: myData.id,
+      proposedByName: myData.displayName,
+      history: initialHistory,
+      replies: [],
+      votes: {},
+      recorded: false,
+    };
+
+    console.log('Creating motion:', motionData);
+    const motionId = await createMotion(motionData);
+    console.log('Motion created with ID:', motionId);
+    
+    // Reset form only after successful creation
+    e.target.reset();
+  } catch (error) {
+    console.error('Error raising motion:', error);
+    alert('Failed to raise motion. Please try again.');
+  }
+};
 
   const addReply = async (motionId, e) => {
     e.preventDefault();
@@ -563,72 +613,97 @@ export default function App() {
     }
   };
 
-  const startVote = async (motionId) => {
-    if (!quorumMet) {
-      alert('Quorum not met. Cannot start voting.');
-      return;
-    }
-    try {
-      await updateMotion(motionId, {
-        status: STATUS_VOTING,
-        history: [{ action: 'Started Voting', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-    } catch (error) {
-      console.error('Error starting vote:', error);
-      alert('Failed to start vote.');
-    }
-  };
+const startVote = async (motionId) => {
+  if (!quorumMet) {
+    alert('Quorum not met. Cannot start voting.');
+    return;
+  }
+  try {
+    await updateMotion(motionId, {
+      status: STATUS_VOTING,
+      history: [{
+        action: 'Started Voting',
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+    });
+  } catch (error) {
+    console.error('Error starting vote:', error);
+    alert('Failed to start vote.');
+  }
+};
 
-  const castVoteOnMotion = async (motionId, vote) => {
-    if (!quorumMet) {
-      alert('Quorum not met. Cannot cast vote.');
-      return;
-    }
-    try {
-      await castVote(motionId, myData.id, vote);
-      await updateMotion(motionId, {
-        history: [{ action: `Voted ${vote}`, userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-    } catch (error) {
-      console.error('Error casting vote:', error);
-      alert('Failed to cast vote.');
-    }
-  };
 
-  const recordDecision = async (motionId, result, summary) => {
-    if (!window.confirm(`Confirm recording decision as ${result}?`)) return;
-    try {
-      await updateMotion(motionId, {
-        status: STATUS_CONCLUDED,
-        recorded: true,
-        result,
-        summary,
-        history: [{ action: `Recorded as ${result}`, userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-    } catch (error) {
-      console.error('Error recording decision:', error);
-      alert('Failed to record decision.');
-    }
-  };
+const castVoteOnMotion = async (motionId, vote) => {
+  if (!quorumMet) {
+    alert('Quorum not met. Cannot cast vote.');
+    return;
+  }
+  try {
+    await castVote(motionId, myData.id, vote);
+    await updateMotion(motionId, {
+      history: [{
+        action: `Voted ${vote}`,
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+    });
+  } catch (error) {
+    console.error('Error casting vote:', error);
+    alert('Failed to cast vote.');
+  }
+};
 
-  const raiseOverturn = async (motion) => {
-    try {
-      await createMotion({
-        committeeId: currentCommitteeId,
-        title: `Overturn: ${motion.title}`,
-        desc: `Overturn previous decision: ${motion.desc}`,
-        status: STATUS_PENDING,
-        type: "procedure",
-        proposedBy: myData.id,
-        proposedByName: myData.displayName,
-        originalMotionId: motion.id,
-        history: [{ action: 'Proposed Overturn', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
-      });
-    } catch (error) {
-      console.error('Error raising overturn:', error);
-      alert('Failed to raise overturn motion.');
-    }
-  };
+
+const recordDecision = async (motionId, result, summary) => {
+  if (!window.confirm(`Confirm recording decision as ${result}?`)) return;
+  try {
+    await updateMotion(motionId, {
+      status: STATUS_CONCLUDED,
+      recorded: true,
+      result,
+      summary,
+      history: [{
+        action: `Recorded as ${result}`,
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+    });
+  } catch (error) {
+    console.error('Error recording decision:', error);
+    alert('Failed to record decision.');
+  }
+};
+
+const raiseOverturn = async (motion) => {
+  try {
+    const committeeIdString = String(currentCommitteeId);
+    await createMotion({
+      committeeId: committeeIdString, // Use string version
+      title: `Overturn: ${motion.title}`,
+      desc: `Overturn previous decision: ${motion.desc}`,
+      status: STATUS_PENDING,
+      type: "procedure",
+      proposedBy: myData.id,
+      proposedByName: myData.displayName,
+      originalMotionId: motion.id,
+      history: [{
+        action: 'Proposed Overturn',
+        userId: myData.id,
+        userName: myData.displayName,
+        timestamp: new Date()
+      }],
+      replies: [],
+      votes: {},
+    });
+  } catch (error) {
+    console.error('Error raising overturn:', error);
+    alert('Failed to raise overturn motion.');
+  }
+};
 
   const handleEmojiClick = () => {
     setShowEmojiPicker(!showEmojiPicker);

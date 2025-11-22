@@ -87,26 +87,37 @@ export const useMotions = (committeeId) => {
 
   useEffect(() => {
     if (!committeeId) {
-      console.log('useMotions: No committeeId provided, resetting motions');
+      console.log('[useMotions] No committeeId provided, resetting motions');
       setMotions([]);
       setLoading(false);
       return;
     }
 
-    console.log('useMotions: Subscribing to motions for committee:', committeeId);
+    // Convert to string to ensure consistency
+    const committeeIdString = String(committeeId);
+    console.log('[useMotions] Subscribing to motions for committee:', committeeIdString);
     setLoading(true);
     setError(null);
 
-    const unsubscribe = subscribeToMotions(committeeId, (newMotions) => {
-      console.log('useMotions: Received motions:', newMotions.length, 'for committee:', committeeId, newMotions);
-      setMotions(newMotions);
-      setLoading(false);
-    });
+    try {
+      const unsubscribe = subscribeToMotions(committeeIdString, (newMotions) => {
+        console.log('[useMotions] Received motions update:', newMotions.length, 'motions for committee:', committeeIdString);
+        console.log('[useMotions] Motion IDs:', newMotions.map(m => m.id));
+        setMotions(newMotions);
+        setLoading(false);
+      });
 
-    return () => {
-      console.log('useMotions: Unsubscribing from motions for committee:', committeeId);
-      unsubscribe();
-    };
+      return () => {
+        console.log('[useMotions] Unsubscribing from motions for committee:', committeeIdString);
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      };
+    } catch (err) {
+      console.error('[useMotions] Error setting up subscription:', err);
+      setError(err);
+      setLoading(false);
+    }
   }, [committeeId]);
 
   return { motions, loading, error };

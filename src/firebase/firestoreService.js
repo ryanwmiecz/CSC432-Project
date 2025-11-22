@@ -229,17 +229,18 @@ export const updateMemberPermission = async (committeeId, userId, permission) =>
 
 export const createMotion = async (motionData) => {
   try {
+    console.log('[createMotion] Creating motion with data:', motionData);
     const docRef = await addDoc(collection(db, MOTIONS_COLLECTION), {
       ...motionData,
-      replies: motionData.replies || [],
-      votes: motionData.votes || {},
-      recorded: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    console.log('[createMotion] Motion created with ID:', docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error('Error creating motion:', error);
+    console.error('[createMotion] Error creating motion:', error);
+    console.error('[createMotion] Error code:', error.code);
+    console.error('[createMotion] Error details:', error.message);
     throw error;
   }
 };
@@ -248,8 +249,7 @@ export const getMotions = async (committeeId) => {
   try {
     const q = query(
       collection(db, MOTIONS_COLLECTION),
-      where('committeeId', '==', committeeId),
-      orderBy('createdAt', 'desc')
+      where('committeeId', '==', committeeId)
     );
     
     const querySnapshot = await getDocs(q);
@@ -260,6 +260,14 @@ export const getMotions = async (committeeId) => {
         ...doc.data(),
       });
     });
+    
+    // Sort in memory
+    motions.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || 0;
+      const bTime = b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime;
+    });
+    
     return motions;
   } catch (error) {
     console.error('Error getting motions:', error);
@@ -268,33 +276,66 @@ export const getMotions = async (committeeId) => {
 };
 
 export const subscribeToMotions = (committeeId, callback) => {
+  console.log('[subscribeToMotions] Setting up subscription for committeeId:', committeeId);
+  
+  // Simpler query - just filter by committeeId, sort in memory
   const q = query(
     collection(db, MOTIONS_COLLECTION),
-    where('committeeId', '==', committeeId),
-    orderBy('createdAt', 'desc')
+    where('committeeId', '==', committeeId)
   );
 
-  return onSnapshot(q, (querySnapshot) => {
-    const motions = [];
-    querySnapshot.forEach((doc) => {
-      motions.push({
-        id: doc.id,
-        ...doc.data(),
+  return onSnapshot(q, 
+    (querySnapshot) => {
+      console.log('[subscribeToMotions] Snapshot received, size:', querySnapshot.size);
+      const motions = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('[subscribeToMotions] Motion doc:', doc.id, data);
+        motions.push({
+          id: doc.id,
+          ...data,
+        });
       });
-    });
-    callback(motions);
-  }, (error) => {
-    console.error('Error in motion subscription:', error);
-  });
+      
+      // Sort in memory by createdAt (newest first)
+      motions.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || 0;
+        const bTime = b.createdAt?.toMillis?.() || 0;
+        return bTime - aTime; // descending order
+      });
+      
+      console.log('[subscribeToMotions] Calling callback with', motions.length, 'motions');
+      callback(motions);
+    }, 
+    (error) => {
+      console.error('[subscribeToMotions] Subscription error:', error);
+      console.error('[subscribeToMotions] Error code:', error.code);
+      console.error('[subscribeToMotions] Error message:', error.message);
+    }
+  );
 };
+
 
 export const updateMotion = async (motionId, updates) => {
   try {
     const motionRef = doc(db, MOTIONS_COLLECTION, motionId);
-    await updateDoc(motionRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    });
+    const motionDoc = await getDoc(motionRef);
+    
+    if (motionDoc.exists()) {
+      // If history is being updated, append to existing history instead of replacing
+      if (updates.history && Array.isArray(updates.history)) {
+        const currentHistory = motionDoc.data().history || [];
+        updates.history = [...currentHistory, ...updates.history];
+      }
+      
+      await updateDoc(motionRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      console.error('Motion document does not exist:', motionId);
+      throw new Error('Motion not found');
+    }
   } catch (error) {
     console.error('Error updating motion:', error);
     throw error;
