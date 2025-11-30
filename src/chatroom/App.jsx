@@ -182,7 +182,7 @@ export default function App() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentCommitteeId, setCurrentCommitteeId] = useState(null);
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
-  const [showHome, setShowHome] = useState(false);
+  const [showHome, setShowHome] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Display-name overrides are stored by Profile.jsx in localStorage.
@@ -340,7 +340,8 @@ export default function App() {
   
   // Get user's permission level in the current committee
   const myPermissionInCommittee = currentCommittee.memberPermissions?.[myData.id] || 'Member';
-  const isChair = myPermissionInCommittee === 'Chair';
+  const isOwner = myPermissionInCommittee === 'Owner';
+  const isChair = myPermissionInCommittee === 'Chair' || isOwner;
   
   const availableUsers = users.filter((u) => !currentCommittee.memberIds?.includes(u.userId));
   const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 2); // 50% quorum
@@ -387,7 +388,7 @@ export default function App() {
         title,
         memberIds: [myData.id],
         memberPermissions: {
-          [myData.id]: 'Chair' // Creator is automatically Chair
+          [myData.id]: 'Owner' // Creator is automatically Owner
         }
       });
       newComRef.current.value = "";
@@ -403,6 +404,73 @@ export default function App() {
     const memberCount = currentCommittee.memberIds?.length || 0;
     const isLastMember = memberCount === 1;
     
+    // If owner is leaving and not the last member, handle ownership transfer
+    if (isOwner && !isLastMember) {
+      // Find all chairs (excluding the owner)
+      const chairs = Object.entries(currentCommittee.memberPermissions || {})
+        .filter(([id, perm]) => perm === 'Chair' && id !== myData.id)
+        .map(([id]) => id);
+      
+      if (chairs.length > 0) {
+        // Promote the first chair to owner
+        const newOwnerId = chairs[0];
+        const newOwner = users.find(u => u.userId === newOwnerId);
+        const newOwnerName = newOwner?.name || 'Unknown';
+        
+        const confirmMessage = `You are the Owner of "${currentCommittee.title}". Leaving will promote ${newOwnerName} (Chair) to Owner. Continue?`;
+        if (!window.confirm(confirmMessage)) return;
+        
+        try {
+          // Promote the chair to owner
+          await updateMemberPermission(currentCommitteeId, newOwnerId, 'Owner');
+          // Remove the current owner
+          await removeMemberFromCommittee(currentCommitteeId, myData.id);
+          
+          // Switch to another committee or home view
+          const remainingCommittees = myCommittees.filter(c => c.id !== currentCommitteeId);
+          if (remainingCommittees.length > 0) {
+            setCurrentCommitteeId(remainingCommittees[0].id);
+          } else {
+            setCurrentCommitteeId(null);
+            setShowHome(true);
+          }
+          return;
+        } catch (error) {
+          console.error('Error transferring ownership:', error);
+          alert('Failed to transfer ownership.');
+          return;
+        }
+      } else {
+        // No chairs exist, delete the committee
+        const confirmMessage = `You are the Owner of "${currentCommittee.title}" and there are no Chairs to transfer ownership to. Leaving will delete this committee. Are you sure?`;
+        if (!window.confirm(confirmMessage)) return;
+        
+        try {
+          await deleteCommittee(currentCommitteeId);
+          
+          // Switch to another committee or home view
+          const remainingCommittees = myCommittees.filter(c => c.id !== currentCommitteeId);
+          if (remainingCommittees.length > 0) {
+            setCurrentCommitteeId(remainingCommittees[0].id);
+          } else {
+            setCurrentCommitteeId(null);
+            setShowHome(true);
+          }
+          return;
+        } catch (error) {
+          console.error('Error deleting committee:', error);
+          alert('Failed to delete committee.');
+          return;
+        }
+      }
+    }
+    
+    // Only Owner can delete the committee if last member
+    if (isLastMember && !isOwner) {
+      alert('You cannot leave this committee as the last member. Only the Owner can delete this committee.');
+      return;
+    }
+    
     const confirmMessage = isLastMember 
       ? `You are the last member of "${currentCommittee.title}". Leaving will delete this committee. Are you sure?`
       : `Are you sure you want to leave "${currentCommittee.title}"?`;
@@ -411,7 +479,7 @@ export default function App() {
 
     try {
       if (isLastMember) {
-        // Delete the committee if this is the last member
+        // Delete the committee if this is the last member (Owner only)
         await deleteCommittee(currentCommitteeId);
       } else {
         // Just remove the member
@@ -434,13 +502,32 @@ export default function App() {
 
   const changeUserRank = async (userId, newPermission) => {
     try {
+      // Prevent Owner from being demoted
+      const targetUserPermission = currentCommittee.memberPermissions?.[userId];
+      if (targetUserPermission === 'Owner' && newPermission !== 'Owner') {
+        alert('The Owner cannot be demoted. Ownership is permanent.');
+        return;
+      }
+      
+      // Only Owner can change permissions
+      if (!isOwner) {
+        alert('Only the Owner can change user permissions.');
+        return;
+      }
+      
+      // Prevent promoting another user to Owner (only one owner allowed)
+      if (newPermission === 'Owner' && userId !== myData.id) {
+        alert('There can only be one Owner per committee. You cannot transfer ownership.');
+        return;
+      }
+      
       // Prevent chair from demoting themselves if they're the only chair
-      if (userId === myData.id && newPermission !== 'Chair') {
+      if (userId === myData.id && newPermission !== 'Chair' && newPermission !== 'Owner') {
         const chairs = Object.entries(currentCommittee.memberPermissions || {})
-          .filter(([id, perm]) => perm === 'Chair');
+          .filter(([id, perm]) => perm === 'Chair' || perm === 'Owner');
         
         if (chairs.length === 1) {
-          alert('You cannot demote yourself. You are the only Chair in this committee. Please promote another member to Chair first.');
+          alert('You cannot demote yourself. You are the only Chair/Owner in this committee. Please promote another member to Chair first.');
           return;
         }
       }
@@ -843,12 +930,14 @@ const raiseOverturn = async (motion) => {
                     <div className="text-xs" aria-live="polite">{isOnline ? 'Online' : 'Offline'}</div>
                   </div>
                   {user.hasStar && <span className="leader-symbol" aria-label="Leader">★</span>}
-                  {isChair && (
+                  {isOwner && (
                     <select
                       value={userPermission}
                       onChange={(e) => changeUserRank(user.userId, e.target.value)}
                       aria-label={`Change permission for ${user.name}`}
+                      disabled={userPermission === 'Owner'}
                     >
+                      <option>Owner</option>
                       <option>Chair</option>
                       <option>Member</option>
                       <option>Observer</option>
@@ -1050,7 +1139,7 @@ const raiseOverturn = async (motion) => {
           {motionsLoading ? (
             <p>Loading motions...</p>
           ) : (
-            <>
+            <div className="active-motions-container">
               {activeMotions.map((motion) => {
                 const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
                 const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
@@ -1164,7 +1253,7 @@ const raiseOverturn = async (motion) => {
                   </div>
                 );
               })}
-            </>
+            </div>
           )}
           {isChair && (
             <div className="control-panel">
@@ -1187,7 +1276,7 @@ const raiseOverturn = async (motion) => {
               </label>
             </div>
           )}
-          <h2>Past Decisions</h2>
+          <h2>Motion History</h2>
           {pastDecisions.map((motion) => {
             const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
             const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;

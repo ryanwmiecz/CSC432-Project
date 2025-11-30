@@ -271,6 +271,11 @@ main {
 
 .new-motion {
   @apply mb-4 p-3 bg-primary rounded;
+  min-height: 250px;
+  max-height: 250px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  flex-grow: 0;
 }
 
 .new-motion h3 {
@@ -293,6 +298,15 @@ main {
 
 .new-motion form button:hover {
   @apply bg-opacity-80;
+}
+
+.active-motions-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+  flex-shrink: 1;
+  flex-grow: 1;
+  margin-bottom: 1rem;
 }
 
 /* Motion cards */
