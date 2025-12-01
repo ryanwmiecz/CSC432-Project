@@ -720,6 +720,12 @@ const startVote = async (motionId) => {
     return;
   }
   try {
+    // Prevent starting vote on a postponed motion
+    const m = normalizedMotions.find(x => x.id === motionId);
+    if (m?.postponed) {
+      alert('Cannot start vote: motion is postponed.');
+      return;
+    }
     await updateMotion(motionId, {
       status: STATUS_VOTING,
       history: [{
@@ -742,6 +748,12 @@ const castVoteOnMotion = async (motionId, vote) => {
     return;
   }
   try {
+    // Prevent voting on postponed motions
+    const m = normalizedMotions.find(x => x.id === motionId);
+    if (m?.postponed) {
+      alert('Cannot vote: motion is postponed.');
+      return;
+    }
     await castVote(motionId, myData.id, vote);
     await updateMotion(motionId, {
       history: [{
@@ -835,6 +847,41 @@ const raiseOverturn = async (motion) => {
   } catch (error) {
     console.error('Error raising overturn:', error);
     alert('Failed to raise overturn motion.');
+  }
+};
+
+// Postpone and resume handlers (Chair-only actions)
+const postponeMotion = async (motionId) => {
+  if (!isChair) {
+    alert('Only the Chair can postpone motions.');
+    return;
+  }
+  try {
+    console.log('[App] postponeMotion called for', motionId);
+    await updateMotion(motionId, {
+      postponed: true,
+      history: [{ action: 'Postponed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }]
+    });
+  } catch (err) {
+    console.error('Error postponing motion:', err);
+    alert('Failed to postpone motion.');
+  }
+};
+
+const resumeMotion = async (motionId) => {
+  if (!isChair) {
+    alert('Only the Chair can resume motions.');
+    return;
+  }
+  try {
+    console.log('[App] resumeMotion called for', motionId);
+    await updateMotion(motionId, {
+      postponed: false,
+      history: [{ action: 'Resumed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }]
+    });
+  } catch (err) {
+    console.error('Error resuming motion:', err);
+    alert('Failed to resume motion.');
   }
 };
 
@@ -1304,8 +1351,19 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                       {motion.type !== "normal" && ` (${motion.type})`}
                     </div>
                     <small>Proposed by: {motion.proposedByName}</small>
+                    {isChair && (
+                      <button
+                        onClick={() => motion.postponed ? resumeMotion(motion.id) : postponeMotion(motion.id)}
+                        style={{ marginLeft: '8px', padding: '4px 8px', fontSize: '12px' }}
+                      >
+                        {motion.postponed ? 'Resume' : 'Postpone'}
+                      </button>
+                    )}
+                    {motion.postponed && (
+                      <div style={{ marginTop: '6px', color: '#FBBF24', fontSize: '12px' }}>Postponed — actions paused</div>
+                    )}
                     {motion.status === STATUS_PENDING && myData.id !== motion.proposedBy && (
-                      <button onClick={() => secondMotion(motion.id)} disabled={!quorumMet}>
+                      <button onClick={() => secondMotion(motion.id)} disabled={!quorumMet || motion.postponed}>
                         Second Motion
                       </button>
                     )}
@@ -1319,7 +1377,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                           </li>
                         ))}
                       </ul>
-                      {motion.status === STATUS_DISCUSSION && (
+                      {motion.status === STATUS_DISCUSSION && !motion.postponed && (
                         <>
                           <form onSubmit={(e) => addReply(motion.id, e)} className="flex flex-col gap-2 mt-2">
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -1357,15 +1415,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                             </div>
                           </form>
                           <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
-                            <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet}>
-                              Call the Question
-                            </button>
-                            {quorumMet && (
-                              <button
-                                onClick={() => setSubMotionParentId(subMotionParentId === motion.id ? null : motion.id)}
-                              >
-                                {subMotionParentId === motion.id ? 'Cancel Submotion' : 'Add Sub-motion'}
+                            <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet || motion.postponed}>
+                                Call the Question
                               </button>
+                            {quorumMet && (
+                                <button
+                                  onClick={() => setSubMotionParentId(subMotionParentId === motion.id ? null : motion.id)}
+                                >
+                                  {subMotionParentId === motion.id ? 'Cancel Submotion' : 'Create Sub-motion'}
+                                </button>
                             )}
                           </div>
 
@@ -1401,7 +1459,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                       )}
                     </div>
                     <div className="poll-interface">
-                      {motion.status === STATUS_VOTING && (
+                      {motion.status === STATUS_VOTING && !motion.postponed && (
                         <>
                           <p>Votes needed: {requiredVotes} ({motion.type === "procedure" ? "2/3" : "Majority"})</p>
                           <button 
@@ -1456,11 +1514,6 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                     {motion.history && <MotionHistory history={motion.history} />}
                     {isChair && (
                       <div style={{ marginTop: '10px' }}>
-                        {motion.status === STATUS_DISCUSSION && (
-                          <button onClick={() => startVote(motion.id)} disabled={!quorumMet}>
-                            Start Vote
-                          </button>
-                        )}
                         {motion.status === STATUS_VOTING && (
                           <>
                             <textarea
