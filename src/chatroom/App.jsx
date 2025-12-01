@@ -31,6 +31,23 @@ const STATUS_VOTING = 2;
 const STATUS_CONCLUDED = 3;
 const motionStatusNames = ["Pending Second", "In Discussion...", "Voting...", "Concluded"];
 
+// Normalize motion.status values coming from Firestore
+const normalizeStatus = (s) => {
+  if (s === undefined || s === null) return STATUS_PENDING;
+  if (typeof s === 'number') return s;
+  if (typeof s === 'string') {
+    // numeric string like "1"
+    const n = parseInt(s, 10);
+    if (!isNaN(n)) return n;
+    const lower = s.toLowerCase();
+    if (lower.includes('disc')) return STATUS_DISCUSSION;
+    if (lower.includes('vote')) return STATUS_VOTING;
+    if (lower.includes('conclud')) return STATUS_CONCLUDED;
+    if (lower.includes('pend')) return STATUS_PENDING;
+  }
+  return STATUS_PENDING;
+};
+
 
 // Helper component for displaying messages with attachments
 const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
@@ -601,24 +618,16 @@ const callTheQuestion = async (motionId) => {
   if (!window.confirm('Call the question to end discussion and start voting?')) return;
 
   try {
-    const committeeIdString = String(currentCommitteeId);
-    await createMotion({
-      committeeId: committeeIdString, // Use string version
-      title: `Call the Question on Motion`,
-      desc: `End discussion and move to vote on motion ${motionId}`,
+    // Update the existing motion to voting so the voting UI stays with the motion
+    console.log('[App] callTheQuestion -> updating motion to VOTING for', motionId);
+    await updateMotion(motionId, {
       status: STATUS_VOTING,
-      type: 'procedure',
-      proposedBy: myData.id,
-      proposedByName: myData.displayName,
-      relatedMotionId: motionId,
       history: [{
         action: 'Called the Question',
         userId: myData.id,
         userName: myData.displayName,
         timestamp: new Date()
       }],
-      replies: [],
-      votes: {},
     });
   } catch (error) {
     console.error('Error calling the question:', error);
@@ -768,8 +777,14 @@ const recordDecision = async (motionId, result, summary) => {
 
 const raiseOverturn = async (motion) => {
   try {
+    // Prevent duplicate overturns
+    if (motion.overturnRaised) {
+      alert('An overturn motion has already been raised for this decision.');
+      return;
+    }
+
     const committeeIdString = String(currentCommitteeId);
-    await createMotion({
+    const overturnData = {
       committeeId: committeeIdString, // Use string version
       title: `Overturn: ${motion.title}`,
       desc: `Overturn previous decision: ${motion.desc}`,
@@ -786,7 +801,26 @@ const raiseOverturn = async (motion) => {
       }],
       replies: [],
       votes: {},
-    });
+    };
+
+    const newMotionId = await createMotion(overturnData);
+
+    // Mark the original motion so no further overturns can be raised
+    try {
+      await updateMotion(motion.id, {
+        overturnRaised: true,
+        history: [{
+          action: 'Overturn Raised',
+          userId: myData.id,
+          userName: myData.displayName,
+          timestamp: new Date()
+        }]
+      });
+    } catch (err) {
+      // Non-fatal: log but continue
+      console.error('Failed to mark original motion as having an overturn:', err);
+    }
+    return newMotionId;
   } catch (error) {
     console.error('Error raising overturn:', error);
     alert('Failed to raise overturn motion.');
@@ -864,8 +898,10 @@ const raiseOverturn = async (motion) => {
     return <div>Loading...</div>;
   }
 
-  const activeMotions = motions.filter(m => !m.recorded);
-  const pastDecisions = motions.filter(m => m.recorded);
+  // Normalize statuses so comparisons work even if Firestore stored strings
+  const normalizedMotions = motions.map((m) => ({ ...m, status: normalizeStatus(m.status) }));
+  const activeMotions = normalizedMotions.filter(m => !m.recorded);
+  const pastDecisions = normalizedMotions.filter(m => m.recorded);
 
   const handleCommitteeSelect = (committeeId) => {
     const selectedCommittee = committees.find(c => c.id === committeeId);
@@ -1370,8 +1406,13 @@ const raiseOverturn = async (motion) => {
                       </div>
                       {motion.history && <MotionHistory history={motion.history} />}
                       {myVote === "yes" && (
-                        <button onClick={() => raiseOverturn(motion)}>
-                          Raise Overturn Motion
+                        <button
+                          onClick={() => raiseOverturn(motion)}
+                          disabled={!!motion.overturnRaised}
+                          style={motion.overturnRaised ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                          aria-disabled={!!motion.overturnRaised}
+                        >
+                          {motion.overturnRaised ? 'Overturn Raised' : 'Raise Overturn Motion'}
                         </button>
                       )}
                     </div>
