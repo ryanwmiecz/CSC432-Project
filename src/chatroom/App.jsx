@@ -202,6 +202,10 @@ export default function App() {
   const [showHome, setShowHome] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [motionsTab, setMotionsTab] = useState('active'); // 'active' or 'history'
+  const [showMotionDebug, setShowMotionDebug] = useState(false);
+  const [subMotionParentId, setSubMotionParentId] = useState(null);
+  const [subTitle, setSubTitle] = useState('');
+  const [subDesc, setSubDesc] = useState('');
 
   // Display-name overrides are stored by Profile.jsx in localStorage.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
@@ -834,6 +838,56 @@ const raiseOverturn = async (motion) => {
   }
 };
 
+// (editMotion removed — edit-as-revise functionality replaced by sub-motions only)
+
+// Create a sub-motion linked to a parent motion
+const createSubMotion = async (parentMotionId, title, desc) => {
+  try {
+    if (!quorumMet) {
+      alert('Quorum not met. Cannot create sub-motion.');
+      return;
+    }
+
+    const motionData = {
+      committeeId: currentCommitteeId,
+      title,
+      desc,
+      status: STATUS_PENDING,
+      type: 'submotion',
+      proposedBy: myData.id,
+      proposedByName: myData.displayName,
+      relatedMotionId: parentMotionId,
+      history: [{ action: 'Submotion Proposed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
+      replies: [],
+      votes: {},
+      recorded: false,
+    };
+
+    const newId = await createMotion(motionData);
+
+    // mark parent motion as revised and add history entry so it moves to history
+    try {
+      await updateMotion(parentMotionId, {
+        revised: true,
+        revisedBy: myData.id,
+        revisedAt: new Date(),
+        revisedTo: newId,
+        history: [{ action: 'Revised (submotion created)', userId: myData.id, userName: myData.displayName, timestamp: new Date() }]
+      });
+    } catch (err) {
+      console.error('Failed to mark parent motion as revised:', err);
+    }
+
+    setSubMotionParentId(null);
+    setSubTitle('');
+    setSubDesc('');
+    return newId;
+  } catch (err) {
+    console.error('Error creating sub-motion:', err);
+    alert('Failed to create sub-motion.');
+  }
+};
+
   const handleEmojiClick = () => {
     setShowEmojiPicker(!showEmojiPicker);
   };
@@ -907,8 +961,10 @@ const raiseOverturn = async (motion) => {
 
   // Normalize statuses so comparisons work even if Firestore stored strings
   const normalizedMotions = motions.map((m) => ({ ...m, status: normalizeStatus(m.status) }));
-  const activeMotions = normalizedMotions.filter(m => !m.recorded);
-  const pastDecisions = normalizedMotions.filter(m => m.recorded);
+  // Active motions exclude recorded or revised ones
+  const activeMotions = normalizedMotions.filter(m => !m.recorded && !m.revised);
+  // Past decisions include recorded or revised motions
+  const pastDecisions = normalizedMotions.filter(m => m.recorded || m.revised);
 
   const handleCommitteeSelect = (committeeId) => {
     const selectedCommittee = committees.find(c => c.id === committeeId);
@@ -1235,6 +1291,14 @@ const raiseOverturn = async (motion) => {
                   <div key={motion.id} className="motion">
                     <h3>{motion.title}</h3>
                     <p>{motion.desc}</p>
+                    {motion.relatedMotionId && (() => {
+                      const parent = normalizedMotions.find(x => x.id === motion.relatedMotionId);
+                      return (
+                        <div style={{ fontSize: '12px', color: '#BFC0C0', marginTop: '6px' }}>
+                          Created from: {parent ? parent.title : motion.relatedMotionId}
+                        </div>
+                      );
+                    })()}
                     <div className="status">
                       Status: {motionStatusNames[motion.status]}
                       {motion.type !== "normal" && ` (${motion.type})`}
@@ -1292,9 +1356,47 @@ const raiseOverturn = async (motion) => {
                               <button type="submit" className="px-3 py-2 rounded bg-accent text-white">Propose Amendment</button>
                             </div>
                           </form>
-                          <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet}>
-                            Call the Question
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
+                            <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet}>
+                              Call the Question
+                            </button>
+                            {quorumMet && (
+                              <button
+                                onClick={() => setSubMotionParentId(subMotionParentId === motion.id ? null : motion.id)}
+                              >
+                                {subMotionParentId === motion.id ? 'Cancel Submotion' : 'Add Sub-motion'}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Edit UI removed — sub-motions used for revisions */}
+
+                          {/* Sub-motion form */}
+                          {subMotionParentId === motion.id && (
+                            <form onSubmit={async (e) => { e.preventDefault(); await createSubMotion(motion.id, subTitle, subDesc); }} className="mt-2 flex flex-col gap-2">
+                              <input value={subTitle} onChange={(e) => setSubTitle(e.target.value)} placeholder="Submotion title" className="p-2 rounded bg-primary text-secondary border border-gray-600" required />
+                              <textarea value={subDesc} onChange={(e) => setSubDesc(e.target.value)} rows={2} placeholder="Submotion description" className="p-2 rounded bg-primary text-secondary border border-gray-600" required />
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button type="submit" className="px-3 py-2 rounded bg-accent text-white">Create Sub-motion</button>
+                                <button type="button" onClick={() => { setSubMotionParentId(null); setSubTitle(''); setSubDesc(''); }} className="px-3 py-2 rounded bg-gray-500 text-white">Cancel</button>
+                              </div>
+                            </form>
+                          )}
+
+                          {/* Render nested sub-motions linked to this motion */}
+                          {normalizedMotions.filter(sm => sm.relatedMotionId === motion.id && !sm.recorded && !sm.revised).length > 0 && (
+                            <div className="submotions mt-2" style={{ paddingLeft: '12px', borderLeft: '2px dashed rgba(255,255,255,0.05)' }}>
+                              <h5 style={{ margin: 0, fontSize: '12px', color: '#BFC0C0' }}>Sub-motions</h5>
+                              {normalizedMotions.filter(sm => sm.relatedMotionId === motion.id && !sm.recorded && !sm.revised).map((sm) => (
+                                <div key={sm.id} style={{ marginTop: '6px', padding: '6px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                  <strong style={{ fontSize: '13px' }}>{sm.title}</strong>
+                                  <div style={{ fontSize: '12px', color: '#BFC0C0' }}>{sm.desc}</div>
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Status: {motionStatusNames[sm.status]}</div>
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Created from: {motion.title}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -1427,7 +1529,22 @@ const raiseOverturn = async (motion) => {
                     <div key={motion.id} className="past-decision">
                       <h3>{motion.title}</h3>
                       <p>{motion.desc}</p>
-                      <div>Result: {motion.result?.toUpperCase()}</div>
+                      <div>
+                        Result: {motion.revised ? (
+                          'Revised'
+                        ) : (
+                          motion.result?.toUpperCase() || 'N/A'
+                        )}
+                        {motion.revised && motion.revisedTo && (() => {
+                          const revisedMotion = normalizedMotions.find(x => x.id === motion.revisedTo);
+                          return (
+                            <div style={{ marginTop: '6px', padding: '8px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: '600' }}>Revised to sub-motion: {revisedMotion ? <span>{revisedMotion.title}</span> : <span>{motion.revisedTo}</span>}</div>
+                              {revisedMotion?.desc && <div style={{ fontSize: '12px', color: '#BFC0C0', marginTop: '4px' }}>{revisedMotion.desc}</div>}
+                            </div>
+                          );
+                        })()}
+                      </div>
                       <div>Summary: {motion.summary}</div>
                       <div>Discussion: {(motion.replies || []).length} replies</div>
                       <div>
