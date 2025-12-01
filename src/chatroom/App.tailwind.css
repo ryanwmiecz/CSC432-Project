@@ -258,19 +258,24 @@ main {
 
 /* Motions section */
 .motions-section {
-  @apply w-80 bg-medium-blue p-4 flex flex-col overflow-hidden;
+  @apply w-80 bg-medium-blue flex flex-col overflow-hidden;
+  padding: 1rem 1rem 0 1rem;
 }
 
 .motions-section h2 {
-  @apply mt-0 text-accent font-bold text-lg mb-3;
+  @apply mt-0 text-accent font-bold text-lg;
+  margin-bottom: 0;
 }
 
-.motions-section > div {
-  @apply flex-1 overflow-y-auto pr-1;
+.motions-section > div:first-child {
+  flex-shrink: 0;
+  margin-bottom: 0;
 }
 
 .new-motion {
-  @apply mb-4 p-3 bg-primary rounded;
+  @apply mb-2 p-3 bg-primary rounded;
+  flex-shrink: 0;
+  flex-grow: 0;
 }
 
 .new-motion h3 {
@@ -293,6 +298,15 @@ main {
 
 .new-motion form button:hover {
   @apply bg-opacity-80;
+}
+
+.active-motions-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+  flex-shrink: 1;
+  flex-grow: 1;
+  margin-bottom: 1rem;
 }
 
 /* Motion cards */
