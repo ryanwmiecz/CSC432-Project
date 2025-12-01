@@ -589,7 +589,7 @@ const proposeAmendment = async (motionId, e) => {
     await addReplyToMotion(motionId, {
       id: myData.id,
       name: myData.displayName,
-      msg: `Amendment: ${amendmentText}`,
+      msg: `${amendmentText}`,
       stance: 'amendment',
     });
     await updateMotion(motionId, {
@@ -777,6 +777,13 @@ const recordDecision = async (motionId, result, summary) => {
 
 const raiseOverturn = async (motion) => {
   try {
+    // Only allow users who voted 'yes' on the original motion to raise an overturn
+    const myVote = motion.votes?.[myData.id];
+    if (myVote !== 'yes') {
+      alert('Only users who voted in favor of the original decision can raise an overturn.');
+      return;
+    }
+
     // Prevent duplicate overturns
     if (motion.overturnRaised) {
       alert('An overturn motion has already been raised for this decision.');
@@ -1250,18 +1257,40 @@ const raiseOverturn = async (motion) => {
                       </ul>
                       {motion.status === STATUS_DISCUSSION && (
                         <>
-                          <form onSubmit={(e) => addReply(motion.id, e)}>
-                            <select name="stance" aria-label="Reply stance">
-                              <option value="pro">Pro</option>
-                              <option value="con">Con</option>
-                              <option value="neutral">Neutral</option>
-                            </select>
-                            <input name="msg" placeholder="Your comment..." required aria-label="Reply comment" />
-                            <button type="submit">Add Reply</button>
+                          <form onSubmit={(e) => addReply(motion.id, e)} className="flex flex-col gap-2 mt-2">
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                              <select name="stance" aria-label="Reply stance" className="p-2 rounded bg-secondary text-primary border border-gray-600" style={{ minWidth: '110px' }}>
+                                <option value="pro">Pro</option>
+                                <option value="con">Con</option>
+                                <option value="neutral">Neutral</option>
+                              </select>
+                              <button type="submit" className="px-3 py-2 rounded bg-accent text-white" style={{ whiteSpace: 'nowrap' }}>Add Reply</button>
+                            </div>
+                            <textarea
+                              name="msg"
+                              rows={3}
+                              placeholder="Your comment..."
+                              required
+                              aria-label="Reply comment"
+                              className="w-full p-2 rounded bg-primary text-secondary border border-gray-600 focus:outline-none"
+                              style={{ resize: 'vertical' }}
+                            />
                           </form>
-                          <form onSubmit={(e) => proposeAmendment(motion.id, e)}>
-                            <input name="amendment" placeholder="Propose amendment..." required aria-label="Amendment text" />
-                            <button type="submit">Propose Amendment</button>
+
+                          <form onSubmit={(e) => proposeAmendment(motion.id, e)} className="flex flex-col gap-2 mt-2">
+                            <label style={{ fontSize: '12px', color: '#BFC0C0' }}>Propose an amendment</label>
+                            <textarea
+                              name="amendment"
+                              rows={2}
+                              placeholder="Propose amendment..."
+                              required
+                              aria-label="Amendment text"
+                              className="w-full p-2 rounded bg-primary text-secondary border border-gray-600 focus:outline-none"
+                              style={{ resize: 'vertical' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <button type="submit" className="px-3 py-2 rounded bg-accent text-white">Propose Amendment</button>
+                            </div>
                           </form>
                           <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet}>
                             Call the Question
