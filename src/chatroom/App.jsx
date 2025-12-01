@@ -184,6 +184,7 @@ export default function App() {
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
   const [showHome, setShowHome] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [motionsTab, setMotionsTab] = useState('active'); // 'active' or 'history'
 
   // Display-name overrides are stored by Profile.jsx in localStorage.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
@@ -1122,8 +1123,50 @@ const raiseOverturn = async (motion) => {
           )}
         </section>
         <aside className="motions-section" ref={motionsRef}>
-          <h2>Motions & Polls</h2>
-          <div className="new-motion">
+          <div style={{ display: 'flex', alignItems: 'flex-start', maxHeight: '40px'}}>
+            <h2 style={{ margin: 0 }}>Motions & Polls</h2>
+            <div style={{ display: 'flex', gap: '5px', marginLeft: 'auto', flexShrink: 0 }}>
+              <button
+                onClick={() => setMotionsTab('active')}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '12px',
+                  backgroundColor: motionsTab === 'active' ? '#EF8354' : '#BFC0C0',
+                  color: motionsTab === 'active' ? 'white' : '#2D3142',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: motionsTab === 'active' ? 'bold' : 'normal',
+                  whiteSpace: 'nowrap',
+                  minWidth: 'fit-content'
+                }}
+                aria-label="View active motions"
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setMotionsTab('history')}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '12px',
+                  backgroundColor: motionsTab === 'history' ? '#EF8354' : '#BFC0C0',
+                  color: motionsTab === 'history' ? 'white' : '#2D3142',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: motionsTab === 'history' ? 'bold' : 'normal',
+                  whiteSpace: 'nowrap',
+                  minWidth: 'fit-content'
+                }}
+                aria-label="View motion history"
+              >
+                History
+              </button>
+            </div>
+          </div>
+          {motionsTab === 'active' && (
+            <>
+              <div className="new-motion">
             <h3>Raise New Motion</h3>
             <form onSubmit={raiseMotion}>
               <input name="title" placeholder="Motion Title" required aria-label="Motion title" />
@@ -1194,9 +1237,36 @@ const raiseOverturn = async (motion) => {
                       {motion.status === STATUS_VOTING && (
                         <>
                           <p>Votes needed: {requiredVotes} ({motion.type === "procedure" ? "2/3" : "Majority"})</p>
-                          <button onClick={() => castVoteOnMotion(motion.id, "yes")}>Vote Yes</button>
-                          <button onClick={() => castVoteOnMotion(motion.id, "no")}>Vote No</button>
-                          <button onClick={() => castVoteOnMotion(motion.id, "abstain")}>Abstain</button>
+                          <button 
+                            onClick={() => castVoteOnMotion(motion.id, "yes")}
+                            style={{
+                              backgroundColor: motion.votes?.[myData.id] === "yes" ? '#10b981' : undefined,
+                              border: motion.votes?.[myData.id] === "yes" ? '2px solid #059669' : undefined,
+                              fontWeight: motion.votes?.[myData.id] === "yes" ? 'bold' : undefined
+                            }}
+                          >
+                            {motion.votes?.[myData.id] === "yes" ? '✓ ' : ''}Vote Yes
+                          </button>
+                          <button 
+                            onClick={() => castVoteOnMotion(motion.id, "no")}
+                            style={{
+                              backgroundColor: motion.votes?.[myData.id] === "no" ? '#ef4444' : undefined,
+                              border: motion.votes?.[myData.id] === "no" ? '2px solid #dc2626' : undefined,
+                              fontWeight: motion.votes?.[myData.id] === "no" ? 'bold' : undefined
+                            }}
+                          >
+                            {motion.votes?.[myData.id] === "no" ? '✓ ' : ''}Vote No
+                          </button>
+                          <button 
+                            onClick={() => castVoteOnMotion(motion.id, "abstain")}
+                            style={{
+                              backgroundColor: motion.votes?.[myData.id] === "abstain" ? '#f59e0b' : undefined,
+                              border: motion.votes?.[myData.id] === "abstain" ? '2px solid #d97706' : undefined,
+                              fontWeight: motion.votes?.[myData.id] === "abstain" ? 'bold' : undefined
+                            }}
+                          >
+                            {motion.votes?.[myData.id] === "abstain" ? '✓ ' : ''}Abstain
+                          </button>
                         </>
                       )}
                     </div>
@@ -1229,7 +1299,7 @@ const raiseOverturn = async (motion) => {
                             <textarea
                               placeholder="Decision summary..."
                               id={`summary-${motion.id}`}
-                              style={{ width: '100%', marginTop: '5px' }}
+                              style={{ width: '100%', marginTop: '5px', backgroundColor: '#fff', color: '#2D3142', padding: '8px', borderRadius: '4px' }}
                               aria-label="Decision summary"
                             />
                             <button onClick={() => recordDecision(
@@ -1276,31 +1346,40 @@ const raiseOverturn = async (motion) => {
               </label>
             </div>
           )}
-          <h2>Motion History</h2>
-          {pastDecisions.map((motion) => {
-            const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
-            const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
-            const abstainVotes = Object.values(motion.votes || {}).filter((v) => v === "abstain").length;
-            const myVote = motion.votes?.[myData.id];
-            return (
-              <div key={motion.id} className="past-decision">
-                <h3>{motion.title}</h3>
-                <p>{motion.desc}</p>
-                <div>Result: {motion.result?.toUpperCase()}</div>
-                <div>Summary: {motion.summary}</div>
-                <div>Discussion: {(motion.replies || []).length} replies</div>
-                <div>
-                  Votes: Yes {yesVotes} | No {noVotes} | Abstain {abstainVotes}
-                </div>
-                {motion.history && <MotionHistory history={motion.history} />}
-                {myVote === "yes" && (
-                  <button onClick={() => raiseOverturn(motion)}>
-                    Raise Overturn Motion
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          </>
+          )}
+          {motionsTab === 'history' && (
+            <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 180px)' }}>
+              {pastDecisions.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#BFC0C0', marginTop: '20px' }}>No recorded decisions yet.</p>
+              ) : (
+                pastDecisions.map((motion) => {
+                  const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
+                  const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
+                  const abstainVotes = Object.values(motion.votes || {}).filter((v) => v === "abstain").length;
+                  const myVote = motion.votes?.[myData.id];
+                  return (
+                    <div key={motion.id} className="past-decision">
+                      <h3>{motion.title}</h3>
+                      <p>{motion.desc}</p>
+                      <div>Result: {motion.result?.toUpperCase()}</div>
+                      <div>Summary: {motion.summary}</div>
+                      <div>Discussion: {(motion.replies || []).length} replies</div>
+                      <div>
+                        Votes: Yes {yesVotes} | No {noVotes} | Abstain {abstainVotes}
+                      </div>
+                      {motion.history && <MotionHistory history={motion.history} />}
+                      {myVote === "yes" && (
+                        <button onClick={() => raiseOverturn(motion)}>
+                          Raise Overturn Motion
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </aside>
         {/* User Profile Modal */}
         {selectedUser && (
