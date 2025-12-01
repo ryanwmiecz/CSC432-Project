@@ -31,6 +31,23 @@ const STATUS_VOTING = 2;
 const STATUS_CONCLUDED = 3;
 const motionStatusNames = ["Pending Second", "In Discussion...", "Voting...", "Concluded"];
 
+// Normalize motion.status values coming from Firestore
+const normalizeStatus = (s) => {
+  if (s === undefined || s === null) return STATUS_PENDING;
+  if (typeof s === 'number') return s;
+  if (typeof s === 'string') {
+    // numeric string like "1"
+    const n = parseInt(s, 10);
+    if (!isNaN(n)) return n;
+    const lower = s.toLowerCase();
+    if (lower.includes('disc')) return STATUS_DISCUSSION;
+    if (lower.includes('vote')) return STATUS_VOTING;
+    if (lower.includes('conclud')) return STATUS_CONCLUDED;
+    if (lower.includes('pend')) return STATUS_PENDING;
+  }
+  return STATUS_PENDING;
+};
+
 
 // Helper component for displaying messages with attachments
 const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
@@ -185,6 +202,10 @@ export default function App() {
   const [showHome, setShowHome] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [motionsTab, setMotionsTab] = useState('active'); // 'active' or 'history'
+  const [showMotionDebug, setShowMotionDebug] = useState(false);
+  const [subMotionParentId, setSubMotionParentId] = useState(null);
+  const [subTitle, setSubTitle] = useState('');
+  const [subDesc, setSubDesc] = useState('');
 
   // Display-name overrides are stored by Profile.jsx in localStorage.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
@@ -572,7 +593,7 @@ const proposeAmendment = async (motionId, e) => {
     await addReplyToMotion(motionId, {
       id: myData.id,
       name: myData.displayName,
-      msg: `Amendment: ${amendmentText}`,
+      msg: `${amendmentText}`,
       stance: 'amendment',
     });
     await updateMotion(motionId, {
@@ -601,24 +622,16 @@ const callTheQuestion = async (motionId) => {
   if (!window.confirm('Call the question to end discussion and start voting?')) return;
 
   try {
-    const committeeIdString = String(currentCommitteeId);
-    await createMotion({
-      committeeId: committeeIdString, // Use string version
-      title: `Call the Question on Motion`,
-      desc: `End discussion and move to vote on motion ${motionId}`,
+    // Update the existing motion to voting so the voting UI stays with the motion
+    console.log('[App] callTheQuestion -> updating motion to VOTING for', motionId);
+    await updateMotion(motionId, {
       status: STATUS_VOTING,
-      type: 'procedure',
-      proposedBy: myData.id,
-      proposedByName: myData.displayName,
-      relatedMotionId: motionId,
       history: [{
         action: 'Called the Question',
         userId: myData.id,
         userName: myData.displayName,
         timestamp: new Date()
       }],
-      replies: [],
-      votes: {},
     });
   } catch (error) {
     console.error('Error calling the question:', error);
@@ -707,6 +720,12 @@ const startVote = async (motionId) => {
     return;
   }
   try {
+    // Prevent starting vote on a postponed motion
+    const m = normalizedMotions.find(x => x.id === motionId);
+    if (m?.postponed) {
+      alert('Cannot start vote: motion is postponed.');
+      return;
+    }
     await updateMotion(motionId, {
       status: STATUS_VOTING,
       history: [{
@@ -729,6 +748,12 @@ const castVoteOnMotion = async (motionId, vote) => {
     return;
   }
   try {
+    // Prevent voting on postponed motions
+    const m = normalizedMotions.find(x => x.id === motionId);
+    if (m?.postponed) {
+      alert('Cannot vote: motion is postponed.');
+      return;
+    }
     await castVote(motionId, myData.id, vote);
     await updateMotion(motionId, {
       history: [{
@@ -768,8 +793,21 @@ const recordDecision = async (motionId, result, summary) => {
 
 const raiseOverturn = async (motion) => {
   try {
+    // Only allow users who voted 'yes' on the original motion to raise an overturn
+    const myVote = motion.votes?.[myData.id];
+    if (myVote !== 'yes') {
+      alert('Only users who voted in favor of the original decision can raise an overturn.');
+      return;
+    }
+
+    // Prevent duplicate overturns
+    if (motion.overturnRaised) {
+      alert('An overturn motion has already been raised for this decision.');
+      return;
+    }
+
     const committeeIdString = String(currentCommitteeId);
-    await createMotion({
+    const overturnData = {
       committeeId: committeeIdString, // Use string version
       title: `Overturn: ${motion.title}`,
       desc: `Overturn previous decision: ${motion.desc}`,
@@ -786,10 +824,114 @@ const raiseOverturn = async (motion) => {
       }],
       replies: [],
       votes: {},
-    });
+    };
+
+    const newMotionId = await createMotion(overturnData);
+
+    // Mark the original motion so no further overturns can be raised
+    try {
+      await updateMotion(motion.id, {
+        overturnRaised: true,
+        history: [{
+          action: 'Overturn Raised',
+          userId: myData.id,
+          userName: myData.displayName,
+          timestamp: new Date()
+        }]
+      });
+    } catch (err) {
+      // Non-fatal: log but continue
+      console.error('Failed to mark original motion as having an overturn:', err);
+    }
+    return newMotionId;
   } catch (error) {
     console.error('Error raising overturn:', error);
     alert('Failed to raise overturn motion.');
+  }
+};
+
+// Postpone and resume handlers (Chair-only actions)
+const postponeMotion = async (motionId) => {
+  if (!isChair) {
+    alert('Only the Chair can postpone motions.');
+    return;
+  }
+  try {
+    console.log('[App] postponeMotion called for', motionId);
+    await updateMotion(motionId, {
+      postponed: true,
+      history: [{ action: 'Postponed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }]
+    });
+  } catch (err) {
+    console.error('Error postponing motion:', err);
+    alert('Failed to postpone motion.');
+  }
+};
+
+const resumeMotion = async (motionId) => {
+  if (!isChair) {
+    alert('Only the Chair can resume motions.');
+    return;
+  }
+  try {
+    console.log('[App] resumeMotion called for', motionId);
+    await updateMotion(motionId, {
+      postponed: false,
+      history: [{ action: 'Resumed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }]
+    });
+  } catch (err) {
+    console.error('Error resuming motion:', err);
+    alert('Failed to resume motion.');
+  }
+};
+
+// (editMotion removed — edit-as-revise functionality replaced by sub-motions only)
+
+// Create a sub-motion linked to a parent motion
+const createSubMotion = async (parentMotionId, title, desc) => {
+  try {
+    if (!quorumMet) {
+      alert('Quorum not met. Cannot create sub-motion.');
+      return;
+    }
+
+    const motionData = {
+      committeeId: currentCommitteeId,
+      title,
+      desc,
+      status: STATUS_PENDING,
+      type: 'submotion',
+      proposedBy: myData.id,
+      proposedByName: myData.displayName,
+      relatedMotionId: parentMotionId,
+      history: [{ action: 'Submotion Proposed', userId: myData.id, userName: myData.displayName, timestamp: new Date() }],
+      replies: [],
+      votes: {},
+      recorded: false,
+    };
+
+    const newId = await createMotion(motionData);
+
+    // mark parent motion as revised and add history entry so it moves to history
+    try {
+      await updateMotion(parentMotionId, {
+        revised: true,
+        revisedBy: myData.id,
+        revisedAt: new Date(),
+        revisedTo: newId,
+        history: [{ action: 'Revised (submotion created)', userId: myData.id, userName: myData.displayName, timestamp: new Date() }]
+      });
+    } catch (err) {
+      console.error('Failed to mark parent motion as revised:', err);
+    }
+
+    setSubMotionParentId(null);
+    setSubTitle('');
+    setSubDesc('');
+    return newId;
+  } catch (err) {
+    console.error('Error creating sub-motion:', err);
+    alert('Failed to create sub-motion.');
   }
 };
 
@@ -864,8 +1006,12 @@ const raiseOverturn = async (motion) => {
     return <div>Loading...</div>;
   }
 
-  const activeMotions = motions.filter(m => !m.recorded);
-  const pastDecisions = motions.filter(m => m.recorded);
+  // Normalize statuses so comparisons work even if Firestore stored strings
+  const normalizedMotions = motions.map((m) => ({ ...m, status: normalizeStatus(m.status) }));
+  // Active motions exclude recorded or revised ones
+  const activeMotions = normalizedMotions.filter(m => !m.recorded && !m.revised);
+  // Past decisions include recorded or revised motions
+  const pastDecisions = normalizedMotions.filter(m => m.recorded || m.revised);
 
   const handleCommitteeSelect = (committeeId) => {
     const selectedCommittee = committees.find(c => c.id === committeeId);
@@ -1192,13 +1338,32 @@ const raiseOverturn = async (motion) => {
                   <div key={motion.id} className="motion">
                     <h3>{motion.title}</h3>
                     <p>{motion.desc}</p>
+                    {motion.relatedMotionId && (() => {
+                      const parent = normalizedMotions.find(x => x.id === motion.relatedMotionId);
+                      return (
+                        <div style={{ fontSize: '12px', color: '#BFC0C0', marginTop: '6px' }}>
+                          Created from: {parent ? parent.title : motion.relatedMotionId}
+                        </div>
+                      );
+                    })()}
                     <div className="status">
                       Status: {motionStatusNames[motion.status]}
                       {motion.type !== "normal" && ` (${motion.type})`}
                     </div>
                     <small>Proposed by: {motion.proposedByName}</small>
+                    {isChair && (
+                      <button
+                        onClick={() => motion.postponed ? resumeMotion(motion.id) : postponeMotion(motion.id)}
+                        style={{ marginLeft: '8px', padding: '4px 8px', fontSize: '12px' }}
+                      >
+                        {motion.postponed ? 'Resume' : 'Postpone'}
+                      </button>
+                    )}
+                    {motion.postponed && (
+                      <div style={{ marginTop: '6px', color: '#FBBF24', fontSize: '12px' }}>Postponed — actions paused</div>
+                    )}
                     {motion.status === STATUS_PENDING && myData.id !== motion.proposedBy && (
-                      <button onClick={() => secondMotion(motion.id)} disabled={!quorumMet}>
+                      <button onClick={() => secondMotion(motion.id)} disabled={!quorumMet || motion.postponed}>
                         Second Motion
                       </button>
                     )}
@@ -1212,29 +1377,89 @@ const raiseOverturn = async (motion) => {
                           </li>
                         ))}
                       </ul>
-                      {motion.status === STATUS_DISCUSSION && (
+                      {motion.status === STATUS_DISCUSSION && !motion.postponed && (
                         <>
-                          <form onSubmit={(e) => addReply(motion.id, e)}>
-                            <select name="stance" aria-label="Reply stance">
-                              <option value="pro">Pro</option>
-                              <option value="con">Con</option>
-                              <option value="neutral">Neutral</option>
-                            </select>
-                            <input name="msg" placeholder="Your comment..." required aria-label="Reply comment" />
-                            <button type="submit">Add Reply</button>
+                          <form onSubmit={(e) => addReply(motion.id, e)} className="flex flex-col gap-2 mt-2">
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                              <select name="stance" aria-label="Reply stance" className="p-2 rounded bg-secondary text-primary border border-gray-600" style={{ minWidth: '110px' }}>
+                                <option value="pro">Pro</option>
+                                <option value="con">Con</option>
+                                <option value="neutral">Neutral</option>
+                              </select>
+                              <button type="submit" className="px-3 py-2 rounded bg-accent text-white" style={{ whiteSpace: 'nowrap' }}>Add Reply</button>
+                            </div>
+                            <textarea
+                              name="msg"
+                              rows={3}
+                              placeholder="Your comment..."
+                              required
+                              aria-label="Reply comment"
+                              className="w-full p-2 rounded bg-primary text-secondary border border-gray-600 focus:outline-none"
+                              style={{ resize: 'vertical' }}
+                            />
                           </form>
-                          <form onSubmit={(e) => proposeAmendment(motion.id, e)}>
-                            <input name="amendment" placeholder="Propose amendment..." required aria-label="Amendment text" />
-                            <button type="submit">Propose Amendment</button>
+
+                          <form onSubmit={(e) => proposeAmendment(motion.id, e)} className="flex flex-col gap-2 mt-2">
+                            <label style={{ fontSize: '12px', color: '#BFC0C0' }}>Propose an amendment</label>
+                            <textarea
+                              name="amendment"
+                              rows={2}
+                              placeholder="Propose amendment..."
+                              required
+                              aria-label="Amendment text"
+                              className="w-full p-2 rounded bg-primary text-secondary border border-gray-600 focus:outline-none"
+                              style={{ resize: 'vertical' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <button type="submit" className="px-3 py-2 rounded bg-accent text-white">Propose Amendment</button>
+                            </div>
                           </form>
-                          <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet}>
-                            Call the Question
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
+                            <button onClick={() => callTheQuestion(motion.id)} disabled={!quorumMet || motion.postponed}>
+                                Call the Question
+                              </button>
+                            {quorumMet && (
+                                <button
+                                  onClick={() => setSubMotionParentId(subMotionParentId === motion.id ? null : motion.id)}
+                                >
+                                  {subMotionParentId === motion.id ? 'Cancel Submotion' : 'Create Sub-motion'}
+                                </button>
+                            )}
+                          </div>
+
+                          {/* Edit UI removed — sub-motions used for revisions */}
+
+                          {/* Sub-motion form */}
+                          {subMotionParentId === motion.id && (
+                            <form onSubmit={async (e) => { e.preventDefault(); await createSubMotion(motion.id, subTitle, subDesc); }} className="mt-2 flex flex-col gap-2">
+                              <input value={subTitle} onChange={(e) => setSubTitle(e.target.value)} placeholder="Submotion title" className="p-2 rounded bg-primary text-secondary border border-gray-600" required />
+                              <textarea value={subDesc} onChange={(e) => setSubDesc(e.target.value)} rows={2} placeholder="Submotion description" className="p-2 rounded bg-primary text-secondary border border-gray-600" required />
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button type="submit" className="px-3 py-2 rounded bg-accent text-white">Create Sub-motion</button>
+                                <button type="button" onClick={() => { setSubMotionParentId(null); setSubTitle(''); setSubDesc(''); }} className="px-3 py-2 rounded bg-gray-500 text-white">Cancel</button>
+                              </div>
+                            </form>
+                          )}
+
+                          {/* Render nested sub-motions linked to this motion */}
+                          {normalizedMotions.filter(sm => sm.relatedMotionId === motion.id && !sm.recorded && !sm.revised).length > 0 && (
+                            <div className="submotions mt-2" style={{ paddingLeft: '12px', borderLeft: '2px dashed rgba(255,255,255,0.05)' }}>
+                              <h5 style={{ margin: 0, fontSize: '12px', color: '#BFC0C0' }}>Sub-motions</h5>
+                              {normalizedMotions.filter(sm => sm.relatedMotionId === motion.id && !sm.recorded && !sm.revised).map((sm) => (
+                                <div key={sm.id} style={{ marginTop: '6px', padding: '6px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                  <strong style={{ fontSize: '13px' }}>{sm.title}</strong>
+                                  <div style={{ fontSize: '12px', color: '#BFC0C0' }}>{sm.desc}</div>
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Status: {motionStatusNames[sm.status]}</div>
+                                  <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Created from: {motion.title}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
                     <div className="poll-interface">
-                      {motion.status === STATUS_VOTING && (
+                      {motion.status === STATUS_VOTING && !motion.postponed && (
                         <>
                           <p>Votes needed: {requiredVotes} ({motion.type === "procedure" ? "2/3" : "Majority"})</p>
                           <button 
@@ -1289,11 +1514,6 @@ const raiseOverturn = async (motion) => {
                     {motion.history && <MotionHistory history={motion.history} />}
                     {isChair && (
                       <div style={{ marginTop: '10px' }}>
-                        {motion.status === STATUS_DISCUSSION && (
-                          <button onClick={() => startVote(motion.id)} disabled={!quorumMet}>
-                            Start Vote
-                          </button>
-                        )}
                         {motion.status === STATUS_VOTING && (
                           <>
                             <textarea
@@ -1362,7 +1582,22 @@ const raiseOverturn = async (motion) => {
                     <div key={motion.id} className="past-decision">
                       <h3>{motion.title}</h3>
                       <p>{motion.desc}</p>
-                      <div>Result: {motion.result?.toUpperCase()}</div>
+                      <div>
+                        Result: {motion.revised ? (
+                          'Revised'
+                        ) : (
+                          motion.result?.toUpperCase() || 'N/A'
+                        )}
+                        {motion.revised && motion.revisedTo && (() => {
+                          const revisedMotion = normalizedMotions.find(x => x.id === motion.revisedTo);
+                          return (
+                            <div style={{ marginTop: '6px', padding: '8px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: '600' }}>Revised to sub-motion: {revisedMotion ? <span>{revisedMotion.title}</span> : <span>{motion.revisedTo}</span>}</div>
+                              {revisedMotion?.desc && <div style={{ fontSize: '12px', color: '#BFC0C0', marginTop: '4px' }}>{revisedMotion.desc}</div>}
+                            </div>
+                          );
+                        })()}
+                      </div>
                       <div>Summary: {motion.summary}</div>
                       <div>Discussion: {(motion.replies || []).length} replies</div>
                       <div>
@@ -1370,8 +1605,13 @@ const raiseOverturn = async (motion) => {
                       </div>
                       {motion.history && <MotionHistory history={motion.history} />}
                       {myVote === "yes" && (
-                        <button onClick={() => raiseOverturn(motion)}>
-                          Raise Overturn Motion
+                        <button
+                          onClick={() => raiseOverturn(motion)}
+                          disabled={!!motion.overturnRaised}
+                          style={motion.overturnRaised ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                          aria-disabled={!!motion.overturnRaised}
+                        >
+                          {motion.overturnRaised ? 'Overturn Raised' : 'Raise Overturn Motion'}
                         </button>
                       )}
                     </div>
