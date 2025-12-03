@@ -13,7 +13,8 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  startAfter
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -40,6 +41,58 @@ export const createMessage = async (messageData) => {
   }
 };
 
+// Paginated message loading - fetches older messages using cursor
+export const getOlderMessages = async (chatroomId, lastMessageDoc, pageSize = 10) => {
+  try {
+    let q = query(
+      collection(db, MESSAGES_COLLECTION),
+      where('chatroomId', '==', chatroomId),
+      orderBy('createdAt', 'desc'),
+      limit(pageSize)
+    );
+
+    // If we have a cursor (last message), start after it
+    if (lastMessageDoc) {
+      q = query(
+        collection(db, MESSAGES_COLLECTION),
+        where('chatroomId', '==', chatroomId),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastMessageDoc),
+        limit(pageSize)
+      );
+    }
+
+    const querySnapshot = await getDocs(q);
+    const messages = [];
+    let cacheCount = 0;
+    let serverCount = 0;
+
+    querySnapshot.forEach((doc) => {
+      messages.push({
+        id: doc.id,
+        ...doc.data(),
+        _doc: doc, // Store document for cursor
+      });
+      if (doc.metadata.fromCache) {
+        cacheCount++;
+      } else {
+        serverCount++;
+      }
+    });
+
+    console.log(`[Messages] 📖 Loaded ${messages.length} older messages: ${cacheCount} from cache, ${serverCount} from server`);
+    
+    return {
+      messages: messages.reverse(),
+      lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1],
+      hasMore: messages.length === pageSize
+    };
+  } catch (error) {
+    console.error('Error getting older messages:', error);
+    throw error;
+  }
+};
+
 export const subscribeToMessages = (chatroomId = null, callback, maxMessages = 100) => {
   let q = query(
     collection(db, MESSAGES_COLLECTION),
@@ -56,14 +109,28 @@ export const subscribeToMessages = (chatroomId = null, callback, maxMessages = 1
     );
   }
 
-  return onSnapshot(q, (querySnapshot) => {
+  return onSnapshot(q, {
+    // Don't trigger callbacks for metadata-only changes (pending writes, etc)
+    includeMetadataChanges: false
+  }, (querySnapshot) => {
     const messages = [];
+    let cacheCount = 0;
+    let serverCount = 0;
+    
     querySnapshot.forEach((doc) => {
       messages.push({
         id: doc.id,
         ...doc.data(),
       });
+      // Track where data came from
+      if (doc.metadata.fromCache) {
+        cacheCount++;
+      } else {
+        serverCount++;
+      }
     });
+    
+    console.log(`[Messages] Loaded ${messages.length} messages: ${cacheCount} from cache, ${serverCount} from server`);
     callback(messages.reverse());
   }, (error) => {
     console.error('Error in message subscription:', error);
@@ -80,6 +147,41 @@ export const deleteMessage = async (messageId) => {
 };
 
 // ============= COMMITTEE OPERATIONS =============
+
+// One-time read for committees (uses cache, no listener costs)
+export const getCommitteesOnce = async (userId = null) => {
+  try {
+    const q = userId 
+      ? query(
+          collection(db, COMMITTEES_COLLECTION),
+          where('memberIds', 'array-contains', userId)
+        )
+      : collection(db, COMMITTEES_COLLECTION);
+    
+    const querySnapshot = await getDocs(q);
+    const committees = [];
+    let cacheCount = 0;
+    let serverCount = 0;
+    
+    querySnapshot.forEach((doc) => {
+      committees.push({
+        id: doc.id,
+        ...doc.data(),
+      });
+      if (doc.metadata.fromCache) {
+        cacheCount++;
+      } else {
+        serverCount++;
+      }
+    });
+    
+    console.log(`[Committees] 📖 One-time read: ${committees.length} committees (${cacheCount} cache, ${serverCount} server)`);
+    return committees;
+  } catch (error) {
+    console.error('Error getting committees:', error);
+    throw error;
+  }
+};
 
 export const createCommittee = async (committeeData) => {
   try {
@@ -115,15 +217,37 @@ export const getCommittees = async () => {
   }
 };
 
-export const subscribeToCommittees = (callback) => {
-  return onSnapshot(collection(db, COMMITTEES_COLLECTION), (querySnapshot) => {
+export const subscribeToCommittees = (callback, userId = null) => {
+  // If userId provided, only subscribe to committees where user is a member
+  const q = userId 
+    ? query(
+        collection(db, COMMITTEES_COLLECTION),
+        where('memberIds', 'array-contains', userId)
+      )
+    : collection(db, COMMITTEES_COLLECTION);
+  
+  console.log(`[Committees] 🔌 Establishing new listener connection${userId ? ` for user: ${userId}` : ' (all committees)'}`);
+  
+  return onSnapshot(q, {
+    includeMetadataChanges: false
+  }, (querySnapshot) => {
     const committees = [];
+    let cacheCount = 0;
+    let serverCount = 0;
+    
     querySnapshot.forEach((doc) => {
       committees.push({
         id: doc.id,
         ...doc.data(),
       });
+      if (doc.metadata.fromCache) {
+        cacheCount++;
+      } else {
+        serverCount++;
+      }
     });
+    
+    console.log(`[Committees] 📦 Loaded ${committees.length} committees: ${cacheCount} from cache, ${serverCount} from server`);
     callback(committees);
   }, (error) => {
     console.error('Error in committee subscription:', error);
@@ -284,17 +408,25 @@ export const subscribeToMotions = (committeeId, callback) => {
     where('committeeId', '==', committeeId)
   );
 
-  return onSnapshot(q, 
+  return onSnapshot(q, {
+    includeMetadataChanges: false
+  },
     (querySnapshot) => {
-      console.log('[subscribeToMotions] Snapshot received, size:', querySnapshot.size);
       const motions = [];
+      let cacheCount = 0;
+      let serverCount = 0;
+      
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log('[subscribeToMotions] Motion doc:', doc.id, data);
         motions.push({
           id: doc.id,
           ...data,
         });
+        if (doc.metadata.fromCache) {
+          cacheCount++;
+        } else {
+          serverCount++;
+        }
       });
       
       // Sort in memory by createdAt (newest first)
@@ -304,7 +436,7 @@ export const subscribeToMotions = (committeeId, callback) => {
         return bTime - aTime; // descending order
       });
       
-      console.log('[subscribeToMotions] Calling callback with', motions.length, 'motions');
+      console.log(`[Motions] Loaded ${motions.length} motions: ${cacheCount} from cache, ${serverCount} from server`);
       callback(motions);
     }, 
     (error) => {
@@ -434,14 +566,26 @@ export const getUsers = async () => {
 };
 
 export const subscribeToUsers = (callback) => {
-  return onSnapshot(collection(db, USERS_COLLECTION), (querySnapshot) => {
+  return onSnapshot(collection(db, USERS_COLLECTION), {
+    includeMetadataChanges: false
+  }, (querySnapshot) => {
     const users = [];
+    let cacheCount = 0;
+    let serverCount = 0;
+    
     querySnapshot.forEach((doc) => {
       users.push({
         id: doc.id,
         ...doc.data(),
       });
+      if (doc.metadata.fromCache) {
+        cacheCount++;
+      } else {
+        serverCount++;
+      }
     });
+    
+    console.log(`[Users] Loaded ${users.length} users: ${cacheCount} from cache, ${serverCount} from server`);
     callback(users);
   }, (error) => {
     console.error('Error in users subscription:', error);
