@@ -1,11 +1,12 @@
 // Custom React hooks for Firestore operations
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   subscribeToMessages, 
   subscribeToCommittees, 
   subscribeToMotions,
   subscribeToUsers 
 } from './firestoreService';
+import { readLimiter } from './readLimiter';
 
 /**
  * Custom hook to subscribe to real-time messages
@@ -19,6 +20,22 @@ export const useMessages = (chatroomId = null, maxMessages = 100) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!chatroomId) {
+      console.log('useMessages: No chatroomId, skipping subscription');
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    const subscriptionKey = `messages-${chatroomId}`;
+    
+    // Rate limiting to prevent spam refresh reads
+    if (!readLimiter.canSubscribe(subscriptionKey)) {
+      console.log('useMessages: Rate limited, using cached data');
+      setLoading(false);
+      return;
+    }
+
     console.log('useMessages: Subscribing to chatroom:', chatroomId);
     setLoading(true);
     setError(null);
@@ -46,31 +63,57 @@ export const useMessages = (chatroomId = null, maxMessages = 100) => {
 
 /**
  * Custom hook to subscribe to real-time committees
+ * @param {string} userId - Optional user ID to filter committees by membership
  * @returns {Object} - { committees, loading, error }
  */
-export const useCommittees = () => {
+export const useCommittees = (userId = null) => {
   const [committees, setCommittees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const unsubscribeRef = useRef(null);
 
   useEffect(() => {
-    console.log('useCommittees: Subscribing to committees');
+    // Prevent subscription if userId is explicitly undefined (not null, not a string)
+    // This handles the initial render before myData.id is set
+    if (userId === undefined) {
+      console.log('useCommittees: Waiting for userId to be determined...');
+      return;
+    }
+
+    const subscriptionKey = `committees-${userId || 'all'}`;
+    
+    // Rate limiting: prevent rapid re-subscriptions (e.g., spam refresh)
+    if (!readLimiter.canSubscribe(subscriptionKey)) {
+      console.log('useCommittees: Rate limited, using cached data');
+      setLoading(false);
+      return;
+    }
+
+    console.log('useCommittees: Subscribing to committees', userId ? `for user ${userId}` : '(all)');
     setLoading(true);
     setError(null);
 
-    const unsubscribe = subscribeToCommittees((newCommittees) => {
+    // Clean up any existing subscription first
+    if (unsubscribeRef.current) {
+      console.log('useCommittees: Cleaning up previous subscription');
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+
+    unsubscribeRef.current = subscribeToCommittees((newCommittees) => {
       console.log('useCommittees: Received committees:', newCommittees.length);
       setCommittees(newCommittees);
       setLoading(false);
-    });
+    }, userId);
 
     return () => {
       console.log('useCommittees: Unsubscribing from committees');
-      if (unsubscribe) {
-        unsubscribe();
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
     };
-  }, []);
+  }, [userId]);
 
   return { committees, loading, error };
 };
@@ -125,21 +168,32 @@ export const useMotions = (committeeId) => {
 
 /**
  * Custom hook to subscribe to real-time users
+ * @param {Array} userIds - Optional array of specific user IDs to track
  * @returns {Object} - { users, loading, error }
  */
-export const useUsers = () => {
+export const useUsers = (userIds = null) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('useUsers: Subscribing to users');
+    // If no userIds provided, don't subscribe (return empty)
+    if (!userIds || userIds.length === 0) {
+      console.log('useUsers: No userIds provided, skipping subscription');
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
+
+    console.log('useUsers: Subscribing to users:', userIds);
     setLoading(true);
     setError(null);
 
     const unsubscribe = subscribeToUsers((newUsers) => {
-      console.log('useUsers: Received users:', newUsers.length);
-      setUsers(newUsers);
+      // Filter to only the requested users
+      const filteredUsers = newUsers.filter(u => userIds.includes(u.userId));
+      console.log('useUsers: Received users:', filteredUsers.length, 'of', newUsers.length);
+      setUsers(filteredUsers);
       setLoading(false);
     });
 
@@ -149,7 +203,7 @@ export const useUsers = () => {
         unsubscribe();
       }
     };
-  }, []);
+  }, [userIds?.join(',')]); // Only re-subscribe if the userIds array changes
 
   return { users, loading, error };
 };

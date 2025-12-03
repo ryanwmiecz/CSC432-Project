@@ -201,6 +201,7 @@ export default function App() {
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
   const [showHome, setShowHome] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchingAllCommittees, setIsSearchingAllCommittees] = useState(false);
   const [motionsTab, setMotionsTab] = useState('active'); // 'active' or 'history'
   const [showMotionDebug, setShowMotionDebug] = useState(false);
   const [subMotionParentId, setSubMotionParentId] = useState(null);
@@ -223,10 +224,30 @@ export default function App() {
   };
 
   // Firestore hooks
-  const { committees, loading: committeesLoading } = useCommittees();
-  const { messages, loading: messagesLoading } = useMessages(currentCommitteeId, 100);
-  const { motions, loading: motionsLoading } = useMotions(currentCommitteeId);
-  const { users } = useUsers();
+  // Subscribe only to committees where user is a member (unless explicitly searching all)
+  // Wait for user ID to be ready before subscribing to avoid double subscriptions
+  // Only use real-time listeners when NOT on home screen (reduce read costs)
+  
+  // Use undefined to prevent subscription until user is loaded, then switch to null (all) or userId (filtered)
+  const committeeSubscriptionId = useMemo(() => {
+    if (!myData.id) return undefined; // Don't subscribe yet
+    return isSearchingAllCommittees ? null : myData.id;
+  }, [myData.id, isSearchingAllCommittees]);
+  
+  const { committees, loading: committeesLoading } = useCommittees(committeeSubscriptionId);
+  
+  // Only subscribe to messages/motions when viewing a committee (not home)
+  const { messages, loading: messagesLoading } = useMessages(showHome ? null : currentCommitteeId, 25);
+  const { motions, loading: motionsLoading } = useMotions(showHome ? null : currentCommitteeId);
+  
+  // Only track users when viewing a committee (not home screen) and only those in that committee
+  const currentCommittee = useMemo(() => {
+    return committees.find((c) => c.id === currentCommitteeId) || { memberIds: [], memberPermissions: {} };
+  }, [committees, currentCommitteeId]);
+  
+  const userIdsToTrack = (!showHome && currentCommitteeId) ? (currentCommittee.memberIds || []) : [];
+  const { users } = useUsers(userIdsToTrack);
+  
   const chatRef = useRef(null);
   const motionsRef = useRef(null);
   const newComRef = useRef(null);
@@ -308,9 +329,16 @@ export default function App() {
     }
   }, [users, myData.id]);
 
-  // Update online status on visibility change and cleanup
+  // Update online status only when viewing a committee (not home screen)
   useEffect(() => {
     if (!myData.id) return;
+    
+    // Only track online status when actually viewing a committee
+    if (showHome || !currentCommitteeId) {
+      // Set offline when on home screen or no committee selected
+      updateUserOnlineStatus(myData.id, false).catch(console.error);
+      return;
+    }
     
     const handleVisibility = () => {
       const isOnline = document.visibilityState === 'visible';
@@ -333,7 +361,7 @@ export default function App() {
       updateUserOnlineStatus(myData.id, false).catch(console.error);
     };
 
-    // Set online when component mounts
+    // Set online when viewing a committee
     updateUserOnlineStatus(myData.id, true).catch(console.error);
 
     document.addEventListener('visibilitychange', handleVisibility);
@@ -341,13 +369,29 @@ export default function App() {
     window.addEventListener('pagehide', handlePageHide);
 
     return () => {
-      // Set offline when component unmounts or user logs out
+      // Set offline when leaving committee view or component unmounts
       updateUserOnlineStatus(myData.id, false).catch(console.error);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handlePageHide);
     };
-  }, [myData.id]);
+  }, [myData.id, showHome, currentCommitteeId]);
+
+  // Debounce search to avoid excessive re-subscriptions
+  useEffect(() => {
+    // If search query is empty, stay in "my committees" mode
+    if (!searchQuery.trim()) {
+      setIsSearchingAllCommittees(false);
+      return;
+    }
+
+    // Debounce: wait 500ms after user stops typing before switching to "all committees" mode
+    const timer = setTimeout(() => {
+      setIsSearchingAllCommittees(true);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -356,8 +400,8 @@ export default function App() {
     }
   }, [messages.length]);
 
-  const currentCommittee = committees.find((c) => c.id === currentCommitteeId) || { memberIds: [], memberPermissions: {} };
-  const currentUsers = users.filter(u => currentCommittee.memberIds?.includes(u.userId));
+  // currentCommittee already defined in hooks section above
+  const currentUsers = users; // users are already filtered to committee members
   const onlineUsers = currentUsers.filter((u) => u.online);
   
   // Get user's permission level in the current committee
@@ -1029,6 +1073,11 @@ const createSubMotion = async (parentMotionId, title, desc) => {
   const filteredCommittees = committees.filter(committee =>
     committee.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  // Message to display when no committees found
+  const noCommitteesMessage = searchQuery 
+    ? `No committees found matching "${searchQuery}"`
+    : 'No committees available. Create one to get started!';
 
   return (
     <div className="dashboard" role="main">
@@ -1146,7 +1195,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                   {committeesLoading ? (
                     <p>Loading committees...</p>
                   ) : filteredCommittees.length === 0 ? (
-                    <p>{searchQuery ? `No committees found matching "${searchQuery}"` : 'No committees available. Create one to get started!'}</p>
+                    <p>{noCommitteesMessage}</p>
                   ) : (
                     filteredCommittees.map((committee) => {
                       const committeeUsers = users.filter(u => committee.memberIds?.includes(u.userId));
