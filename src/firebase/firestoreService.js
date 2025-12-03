@@ -13,7 +13,8 @@ import {
   where,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  startAfter
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -36,6 +37,58 @@ export const createMessage = async (messageData) => {
     return docRef.id;
   } catch (error) {
     console.error('Error creating message:', error);
+    throw error;
+  }
+};
+
+// Paginated message loading - fetches older messages using cursor
+export const getOlderMessages = async (chatroomId, lastMessageDoc, pageSize = 10) => {
+  try {
+    let q = query(
+      collection(db, MESSAGES_COLLECTION),
+      where('chatroomId', '==', chatroomId),
+      orderBy('createdAt', 'desc'),
+      limit(pageSize)
+    );
+
+    // If we have a cursor (last message), start after it
+    if (lastMessageDoc) {
+      q = query(
+        collection(db, MESSAGES_COLLECTION),
+        where('chatroomId', '==', chatroomId),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastMessageDoc),
+        limit(pageSize)
+      );
+    }
+
+    const querySnapshot = await getDocs(q);
+    const messages = [];
+    let cacheCount = 0;
+    let serverCount = 0;
+
+    querySnapshot.forEach((doc) => {
+      messages.push({
+        id: doc.id,
+        ...doc.data(),
+        _doc: doc, // Store document for cursor
+      });
+      if (doc.metadata.fromCache) {
+        cacheCount++;
+      } else {
+        serverCount++;
+      }
+    });
+
+    console.log(`[Messages] 📖 Loaded ${messages.length} older messages: ${cacheCount} from cache, ${serverCount} from server`);
+    
+    return {
+      messages: messages.reverse(),
+      lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1],
+      hasMore: messages.length === pageSize
+    };
+  } catch (error) {
+    console.error('Error getting older messages:', error);
     throw error;
   }
 };

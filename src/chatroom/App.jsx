@@ -237,7 +237,8 @@ export default function App() {
   const { committees, loading: committeesLoading } = useCommittees(committeeSubscriptionId);
   
   // Only subscribe to messages/motions when viewing a committee (not home)
-  const { messages, loading: messagesLoading } = useMessages(showHome ? null : currentCommitteeId, 25);
+  // Start with 10 messages, load more on demand
+  const { messages, loading: messagesLoading, loadMore, hasMore, isLoadingMore } = useMessages(showHome ? null : currentCommitteeId, 10);
   const { motions, loading: motionsLoading } = useMotions(showHome ? null : currentCommitteeId);
   
   // Only track users when viewing a committee (not home screen) and only those in that committee
@@ -295,15 +296,13 @@ export default function App() {
     }
   }, [navigate, auth0Available, isAuthenticated, isLoading, user]);
 
-  // Set default committee and auto-join if not a member
+  // Set default committee (removed auto-join behavior)
   useEffect(() => {
     if (committees.length > 0 && !currentCommitteeId) {
       const firstCommittee = committees[0];
-      setCurrentCommitteeId(firstCommittee.id);
-      
-      // Auto-join the first committee if user is not already a member
-      if (myData.id && !firstCommittee.memberIds?.includes(myData.id)) {
-        addMemberToCommittee(firstCommittee.id, myData.id).catch(console.error);
+      // Only set as current if user is already a member
+      if (myData.id && firstCommittee.memberIds?.includes(myData.id)) {
+        setCurrentCommitteeId(firstCommittee.id);
       }
     }
   }, [committees, currentCommitteeId, myData.id]);
@@ -393,12 +392,24 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Auto-scroll chat to bottom
+  // Auto-scroll chat to bottom only when new messages arrive (not when loading older)
+  const prevMessageCountRef = useRef(0);
+  
   useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    if (chatRef.current && messages.length > 0) {
+      const isNewMessage = messages.length > prevMessageCountRef.current;
+      const isAtBottom = chatRef.current.scrollHeight - chatRef.current.scrollTop - chatRef.current.clientHeight < 100;
+      
+      // Only auto-scroll if:
+      // 1. New message arrived (length increased)
+      // 2. User is already near bottom
+      if (isNewMessage && (isAtBottom || prevMessageCountRef.current === 0)) {
+        chatRef.current.scrollTop = chatRef.current.scrollHeight;
+      }
+      
+      prevMessageCountRef.current = messages.length;
     }
-  }, [messages.length]);
+  }, [messages]);
 
   // currentCommittee already defined in hooks section above
   const currentUsers = users; // users are already filtered to committee members
@@ -1266,7 +1277,35 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                 {messagesLoading ? (
                   <div className="loading-messages">Loading messages...</div>
                 ) : (
-                  messages.map((m) => (
+                  <>
+                    {/* Load More Button at top */}
+                    {hasMore && messages.length > 0 && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '10px',
+                        marginBottom: '10px'
+                      }}>
+                        <button
+                          onClick={loadMore}
+                          disabled={isLoadingMore}
+                          style={{
+                            backgroundColor: '#4F5D75',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '4px',
+                            cursor: isLoadingMore ? 'not-allowed' : 'pointer',
+                            fontSize: '14px',
+                            opacity: isLoadingMore ? 0.6 : 1
+                          }}
+                          aria-label="Load older messages"
+                        >
+                          {isLoadingMore ? '⏳ Loading...' : '📜 Load Older Messages'}
+                        </button>
+                      </div>
+                    )}
+                    
+                    {messages.map((m) => (
                       <ChatMessage
                         key={m.id}
                         m={m}
@@ -1275,7 +1314,8 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                         onDelete={handleDeleteMessage}
                         onShowProfile={setSelectedUser}
                       />
-                  ))
+                    ))}
+                  </>
                 )}
               </div>
               <div className="chat-input-container">
