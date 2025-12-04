@@ -448,7 +448,7 @@ export default function App() {
   const isChair = myPermissionInCommittee === 'Chair' || isOwner;
   
   const availableUsers = users.filter((u) => !currentCommittee.memberIds?.includes(u.userId));
-  const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 2); // 50% quorum
+  const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 4); // 25% quorum
   
   // Filter committees to only show ones the user is a member of
   const myCommittees = committees.filter(c => c.memberIds?.includes(myData.id));
