@@ -74,11 +74,19 @@ const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
           className="p-0 border-0 bg-transparent cursor-pointer mr-3 ml-3"
           aria-label={`View profile for ${sender}`}
         >
-          <img
-            src={senderImage}
-            alt={`${sender}'s avatar`}
-            className="w-8 h-8 rounded-full object-cover"
-          />
+          {senderImage === 'placeholder-avatar.png' ? (
+            <div
+              className="w-8 h-8 rounded-full"
+              style={{ backgroundColor: getRandomColorForUser(m.userId || m.id) }}
+            >
+            </div>
+          ) : (
+            <img
+              src={senderImage}
+              alt={`${sender}'s avatar`}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          )}
         </button>
 
         <div 
@@ -164,6 +172,25 @@ const readImageOverrides = () => {
     return {};
   }
 };
+// Generate a deterministic random color based on user ID
+const getRandomColorForUser = (userId) => {
+  if (!userId) return 'rgb(150, 150, 150)';
+  
+  // Simple hash function to generate consistent colors
+  let hash = 0;
+  const str = String(userId);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generate RGB values (avoid too dark or too light)
+  const r = ((hash & 0xFF0000) >> 16) % 180 + 60;
+  const g = ((hash & 0x00FF00) >> 8) % 180 + 60;
+  const b = (hash & 0x0000FF) % 180 + 60;
+  
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 const getImageFor = (id, fallback) => {
   const map = readImageOverrides();
   return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
@@ -421,7 +448,7 @@ export default function App() {
   const isChair = myPermissionInCommittee === 'Chair' || isOwner;
   
   const availableUsers = users.filter((u) => !currentCommittee.memberIds?.includes(u.userId));
-  const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 2); // 50% quorum
+  const quorumMet = onlineUsers.length >= Math.ceil(currentUsers.length / 4); // 25% quorum
   
   // Filter committees to only show ones the user is a member of
   const myCommittees = committees.filter(c => c.memberIds?.includes(myData.id));
@@ -623,10 +650,13 @@ const secondMotion = async (motionId) => {
     return;
   }
   try {
+    const m = normalizedMotions.find(x => x.id === motionId);
+    // Special motions skip discussion and go straight to voting after being seconded
+    const newStatus = m?.type === 'special' ? STATUS_VOTING : STATUS_DISCUSSION;
     await updateMotion(motionId, {
-      status: STATUS_DISCUSSION,
+      status: newStatus,
       history: [{
-        action: 'Seconded',
+        action: m?.type === 'special' ? 'Seconded (Special Motion - No Discussion)' : 'Seconded',
         userId: myData.id,
         userName: myData.displayName,
         timestamp: new Date()
@@ -774,11 +804,20 @@ const startVote = async (motionId) => {
     alert('Quorum not met. Cannot start voting.');
     return;
   }
+  if (!isChair) {
+    alert('Only the Chair can start voting.');
+    return;
+  }
   try {
     // Prevent starting vote on a postponed motion
     const m = normalizedMotions.find(x => x.id === motionId);
     if (m?.postponed) {
       alert('Cannot start vote: motion is postponed.');
+      return;
+    }
+    // Special motions skip discussion and go straight to vote
+    if (m?.type === 'special' && m?.status === STATUS_PENDING) {
+      alert('Special motions must be seconded before voting.');
       return;
     }
     await updateMotion(motionId, {
@@ -826,13 +865,47 @@ const castVoteOnMotion = async (motionId, vote) => {
 
 
 const recordDecision = async (motionId, result, summary) => {
-  if (!window.confirm(`Confirm recording decision as ${result}?`)) return;
+  // Validate quorum is still met
+  if (!quorumMet) {
+    alert('Cannot record decision: quorum is no longer met.');
+    return;
+  }
+  
+  // Get motion to validate vote counts
+  const motion = normalizedMotions.find(m => m.id === motionId);
+  if (!motion) {
+    alert('Motion not found.');
+    return;
+  }
+  
+  // Calculate vote requirements
+  const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
+  const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
+  const totalVotes = yesVotes + noVotes;
+  const requiredVotes = motion.type === "procedure" 
+    ? Math.ceil(totalVotes * 2 / 3) 
+    : Math.floor(totalVotes / 2) + 1;
+  
+  // Validate the result matches vote counts
+  if (result === 'passed' && yesVotes < requiredVotes) {
+    alert(`Cannot record as passed: only ${yesVotes} yes votes, but ${requiredVotes} required for ${motion.type === 'procedure' ? '2/3 majority' : 'simple majority'}.`);
+    return;
+  }
+  
+  if (result === 'failed' && yesVotes >= requiredVotes) {
+    alert(`Cannot record as failed: motion has ${yesVotes} yes votes, which meets the ${requiredVotes} required.`);
+    return;
+  }
+  
+  if (!window.confirm(`Confirm recording decision as ${result}?\n\nYes: ${yesVotes} | No: ${noVotes} | Required: ${requiredVotes}`)) return;
+  
   try {
     await updateMotion(motionId, {
       status: STATUS_CONCLUDED,
       recorded: true,
       result,
       summary,
+      finalVoteCounts: { yes: yesVotes, no: noVotes, abstain: Object.values(motion.votes || {}).filter((v) => v === "abstain").length },
       history: [{
         action: `Recorded as ${result}`,
         userId: myData.id,
@@ -1105,7 +1178,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
         </div>
         {/* Firebase project indicator removed from UI (kept console debug in config) */}
         <div className="user-profile flex items-center space-x-3">
-          <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+          {resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png') === 'placeholder-avatar.png' ? (
+            <div
+              className="w-8 h-8 rounded-full"
+              style={{ backgroundColor: getRandomColorForUser(myData.id) }}
+            >
+            </div>
+          ) : (
+            <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+          )}
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
@@ -1125,7 +1206,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
               return (
                 <li key={user.id} className={`flex items-center space-x-2 ${isOnline ? '' : 'opacity-60'}`}>
                   <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
-                    <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className={`w-8 h-8 rounded-full object-cover ${isOnline ? '' : 'grayscale'}`} />
+                    {avatarSrc === 'placeholder-avatar.png' ? (
+                      <div
+                        className={`w-8 h-8 rounded-full ${isOnline ? '' : 'grayscale'}`}
+                        style={{ backgroundColor: getRandomColorForUser(user.userId) }}
+                      >
+                      </div>
+                    ) : (
+                      <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className={`w-8 h-8 rounded-full object-cover ${isOnline ? '' : 'grayscale'}`} />
+                    )}
                   </button>
                   <div className="flex-1">
                     <div className={`font-semibold text-sm ${isOnline ? '' : 'text-gray-400'}`}>
@@ -1357,9 +1446,10 @@ const createSubMotion = async (parentMotionId, title, desc) => {
             </>
           )}
         </section>
-        <aside className="motions-section" ref={motionsRef}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', maxHeight: '40px'}}>
-            <h2 style={{ margin: 0 }}>Motions & Polls</h2>
+        {!showHome && (
+          <aside className="motions-section" ref={motionsRef}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', maxHeight: '40px'}}>
+              <h2 style={{ margin: 0 }}>Motions & Polls</h2>
             <div style={{ display: 'flex', gap: '5px', marginLeft: 'auto', flexShrink: 0 }}>
               <button
                 onClick={() => setMotionsTab('active')}
@@ -1421,8 +1511,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
               {activeMotions.map((motion) => {
                 const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
                 const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
-                const totalVotes = yesVotes + noVotes;
-                const requiredVotes = motion.type === "procedure" ? Math.ceil(totalVotes * 2 / 3) : Math.ceil(totalVotes / 2);
+                const abstainVotes = Object.values(motion.votes || {}).filter((v) => v === "abstain").length;
+                const totalVotes = yesVotes + noVotes; // Abstentions don't count toward total
+                // For majority: need MORE than half (not equal to half)
+                // For 2/3: need at least 2/3 of votes cast
+                const requiredVotes = motion.type === "procedure" 
+                  ? Math.ceil(totalVotes * 2 / 3) 
+                  : Math.floor(totalVotes / 2) + 1;
+                const hasPassedVotes = yesVotes >= requiredVotes;
+                const hasFailedVotes = totalVotes > 0 && noVotes >= requiredVotes;
                 return (
                   <div key={motion.id} className="motion">
                     <h3>{motion.title}</h3>
@@ -1451,9 +1548,14 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                     {motion.postponed && (
                       <div style={{ marginTop: '6px', color: '#FBBF24', fontSize: '12px' }}>Postponed — actions paused</div>
                     )}
+                    {motion.type === 'special' && motion.status === STATUS_PENDING && (
+                      <div style={{ marginTop: '6px', color: '#60A5FA', fontSize: '12px', fontStyle: 'italic' }}>
+                        ⚡ Special Motion: No discussion allowed - goes directly to vote after seconding
+                      </div>
+                    )}
                     {motion.status === STATUS_PENDING && myData.id !== motion.proposedBy && (
                       <button onClick={() => secondMotion(motion.id)} disabled={!quorumMet || motion.postponed}>
-                        Second Motion
+                        {motion.type === 'special' ? 'Second & Vote' : 'Second Motion'}
                       </button>
                     )}
                     <div className="replies">
@@ -1466,7 +1568,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                           </li>
                         ))}
                       </ul>
-                      {motion.status === STATUS_DISCUSSION && !motion.postponed && (
+                      {motion.status === STATUS_DISCUSSION && !motion.postponed && motion.type !== 'special' && (
                         <>
                           <form onSubmit={(e) => addReply(motion.id, e)} className="flex flex-col gap-2 mt-2">
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -1551,6 +1653,13 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                       {motion.status === STATUS_VOTING && !motion.postponed && (
                         <>
                           <p>Votes needed: {requiredVotes} ({motion.type === "procedure" ? "2/3" : "Majority"})</p>
+                          {totalVotes > 0 && (
+                            <p style={{ fontSize: '14px', marginTop: '8px', color: hasPassedVotes ? '#10b981' : hasFailedVotes ? '#ef4444' : '#BFC0C0' }}>
+                              Current: Yes {yesVotes} / No {noVotes} / Abstain {abstainVotes}
+                              {hasPassedVotes && ' ✓ Passes'}
+                              {hasFailedVotes && ' ✗ Fails'}
+                            </p>
+                          )}
                           <button 
                             onClick={() => castVoteOnMotion(motion.id, "yes")}
                             style={{
@@ -1611,19 +1720,29 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                               style={{ width: '100%', marginTop: '5px', backgroundColor: '#fff', color: '#2D3142', padding: '8px', borderRadius: '4px' }}
                               aria-label="Decision summary"
                             />
-                            <button onClick={() => recordDecision(
-                              motion.id,
-                              "passed",
-                              document.getElementById(`summary-${motion.id}`).value
-                            )}>
-                              Record Passed
+                            <button 
+                              onClick={() => recordDecision(
+                                motion.id,
+                                "passed",
+                                document.getElementById(`summary-${motion.id}`).value
+                              )}
+                              disabled={!hasPassedVotes}
+                              style={!hasPassedVotes ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                              title={!hasPassedVotes ? `Cannot record as passed: only ${yesVotes}/${requiredVotes} required votes` : ''}
+                            >
+                              Record Passed {hasPassedVotes ? '✓' : '✗'}
                             </button>
-                            <button onClick={() => recordDecision(
-                              motion.id,
-                              "failed",
-                              document.getElementById(`summary-${motion.id}`).value
-                            )}>
-                              Record Failed
+                            <button 
+                              onClick={() => recordDecision(
+                                motion.id,
+                                "failed",
+                                document.getElementById(`summary-${motion.id}`).value
+                              )}
+                              disabled={hasPassedVotes && totalVotes > 0}
+                              style={hasPassedVotes && totalVotes > 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                              title={hasPassedVotes ? `Cannot record as failed: motion has ${yesVotes}/${requiredVotes} required votes` : ''}
+                            >
+                              Record Failed {hasFailedVotes || (totalVotes > 0 && !hasPassedVotes) ? '✓' : '✗'}
                             </button>
                           </>
                         )}
@@ -1710,6 +1829,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
             </div>
           )}
         </aside>
+        )}
         {/* User Profile Modal */}
         {selectedUser && (
           <div
@@ -1724,7 +1844,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center space-x-4 mb-4">
-                <img src={resolveUserImage(selectedUser, 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                {resolveUserImage(selectedUser, 'placeholder-avatar.png') === 'placeholder-avatar.png' ? (
+                  <div
+                    className="w-16 h-16 rounded-full"
+                    style={{ backgroundColor: getRandomColorForUser(selectedUser.userId || selectedUser.id) }}
+                  >
+                  </div>
+                ) : (
+                  <img src={resolveUserImage(selectedUser, 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                )}
                 <div>
                   <h3 className="text-white text-lg font-bold">{selectedUser.name || selectedUser.userId}</h3>
                   <div className="text-xs text-gray-400">{selectedUser.online ? 'Online' : 'Offline'}</div>
