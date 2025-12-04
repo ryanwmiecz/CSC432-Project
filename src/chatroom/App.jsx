@@ -650,10 +650,13 @@ const secondMotion = async (motionId) => {
     return;
   }
   try {
+    const m = normalizedMotions.find(x => x.id === motionId);
+    // Special motions skip discussion and go straight to voting after being seconded
+    const newStatus = m?.type === 'special' ? STATUS_VOTING : STATUS_DISCUSSION;
     await updateMotion(motionId, {
-      status: STATUS_DISCUSSION,
+      status: newStatus,
       history: [{
-        action: 'Seconded',
+        action: m?.type === 'special' ? 'Seconded (Special Motion - No Discussion)' : 'Seconded',
         userId: myData.id,
         userName: myData.displayName,
         timestamp: new Date()
@@ -801,11 +804,20 @@ const startVote = async (motionId) => {
     alert('Quorum not met. Cannot start voting.');
     return;
   }
+  if (!isChair) {
+    alert('Only the Chair can start voting.');
+    return;
+  }
   try {
     // Prevent starting vote on a postponed motion
     const m = normalizedMotions.find(x => x.id === motionId);
     if (m?.postponed) {
       alert('Cannot start vote: motion is postponed.');
+      return;
+    }
+    // Special motions skip discussion and go straight to vote
+    if (m?.type === 'special' && m?.status === STATUS_PENDING) {
+      alert('Special motions must be seconded before voting.');
       return;
     }
     await updateMotion(motionId, {
@@ -853,13 +865,47 @@ const castVoteOnMotion = async (motionId, vote) => {
 
 
 const recordDecision = async (motionId, result, summary) => {
-  if (!window.confirm(`Confirm recording decision as ${result}?`)) return;
+  // Validate quorum is still met
+  if (!quorumMet) {
+    alert('Cannot record decision: quorum is no longer met.');
+    return;
+  }
+  
+  // Get motion to validate vote counts
+  const motion = normalizedMotions.find(m => m.id === motionId);
+  if (!motion) {
+    alert('Motion not found.');
+    return;
+  }
+  
+  // Calculate vote requirements
+  const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
+  const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
+  const totalVotes = yesVotes + noVotes;
+  const requiredVotes = motion.type === "procedure" 
+    ? Math.ceil(totalVotes * 2 / 3) 
+    : Math.floor(totalVotes / 2) + 1;
+  
+  // Validate the result matches vote counts
+  if (result === 'passed' && yesVotes < requiredVotes) {
+    alert(`Cannot record as passed: only ${yesVotes} yes votes, but ${requiredVotes} required for ${motion.type === 'procedure' ? '2/3 majority' : 'simple majority'}.`);
+    return;
+  }
+  
+  if (result === 'failed' && yesVotes >= requiredVotes) {
+    alert(`Cannot record as failed: motion has ${yesVotes} yes votes, which meets the ${requiredVotes} required.`);
+    return;
+  }
+  
+  if (!window.confirm(`Confirm recording decision as ${result}?\n\nYes: ${yesVotes} | No: ${noVotes} | Required: ${requiredVotes}`)) return;
+  
   try {
     await updateMotion(motionId, {
       status: STATUS_CONCLUDED,
       recorded: true,
       result,
       summary,
+      finalVoteCounts: { yes: yesVotes, no: noVotes, abstain: Object.values(motion.votes || {}).filter((v) => v === "abstain").length },
       history: [{
         action: `Recorded as ${result}`,
         userId: myData.id,
@@ -1465,8 +1511,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
               {activeMotions.map((motion) => {
                 const yesVotes = Object.values(motion.votes || {}).filter((v) => v === "yes").length;
                 const noVotes = Object.values(motion.votes || {}).filter((v) => v === "no").length;
-                const totalVotes = yesVotes + noVotes;
-                const requiredVotes = motion.type === "procedure" ? Math.ceil(totalVotes * 2 / 3) : Math.ceil(totalVotes / 2);
+                const abstainVotes = Object.values(motion.votes || {}).filter((v) => v === "abstain").length;
+                const totalVotes = yesVotes + noVotes; // Abstentions don't count toward total
+                // For majority: need MORE than half (not equal to half)
+                // For 2/3: need at least 2/3 of votes cast
+                const requiredVotes = motion.type === "procedure" 
+                  ? Math.ceil(totalVotes * 2 / 3) 
+                  : Math.floor(totalVotes / 2) + 1;
+                const hasPassedVotes = yesVotes >= requiredVotes;
+                const hasFailedVotes = totalVotes > 0 && noVotes >= requiredVotes;
                 return (
                   <div key={motion.id} className="motion">
                     <h3>{motion.title}</h3>
@@ -1495,9 +1548,14 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                     {motion.postponed && (
                       <div style={{ marginTop: '6px', color: '#FBBF24', fontSize: '12px' }}>Postponed — actions paused</div>
                     )}
+                    {motion.type === 'special' && motion.status === STATUS_PENDING && (
+                      <div style={{ marginTop: '6px', color: '#60A5FA', fontSize: '12px', fontStyle: 'italic' }}>
+                        ⚡ Special Motion: No discussion allowed - goes directly to vote after seconding
+                      </div>
+                    )}
                     {motion.status === STATUS_PENDING && myData.id !== motion.proposedBy && (
                       <button onClick={() => secondMotion(motion.id)} disabled={!quorumMet || motion.postponed}>
-                        Second Motion
+                        {motion.type === 'special' ? 'Second & Vote' : 'Second Motion'}
                       </button>
                     )}
                     <div className="replies">
@@ -1510,7 +1568,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                           </li>
                         ))}
                       </ul>
-                      {motion.status === STATUS_DISCUSSION && !motion.postponed && (
+                      {motion.status === STATUS_DISCUSSION && !motion.postponed && motion.type !== 'special' && (
                         <>
                           <form onSubmit={(e) => addReply(motion.id, e)} className="flex flex-col gap-2 mt-2">
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -1595,6 +1653,13 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                       {motion.status === STATUS_VOTING && !motion.postponed && (
                         <>
                           <p>Votes needed: {requiredVotes} ({motion.type === "procedure" ? "2/3" : "Majority"})</p>
+                          {totalVotes > 0 && (
+                            <p style={{ fontSize: '14px', marginTop: '8px', color: hasPassedVotes ? '#10b981' : hasFailedVotes ? '#ef4444' : '#BFC0C0' }}>
+                              Current: Yes {yesVotes} / No {noVotes} / Abstain {abstainVotes}
+                              {hasPassedVotes && ' ✓ Passes'}
+                              {hasFailedVotes && ' ✗ Fails'}
+                            </p>
+                          )}
                           <button 
                             onClick={() => castVoteOnMotion(motion.id, "yes")}
                             style={{
@@ -1655,19 +1720,29 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                               style={{ width: '100%', marginTop: '5px', backgroundColor: '#fff', color: '#2D3142', padding: '8px', borderRadius: '4px' }}
                               aria-label="Decision summary"
                             />
-                            <button onClick={() => recordDecision(
-                              motion.id,
-                              "passed",
-                              document.getElementById(`summary-${motion.id}`).value
-                            )}>
-                              Record Passed
+                            <button 
+                              onClick={() => recordDecision(
+                                motion.id,
+                                "passed",
+                                document.getElementById(`summary-${motion.id}`).value
+                              )}
+                              disabled={!hasPassedVotes}
+                              style={!hasPassedVotes ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                              title={!hasPassedVotes ? `Cannot record as passed: only ${yesVotes}/${requiredVotes} required votes` : ''}
+                            >
+                              Record Passed {hasPassedVotes ? '✓' : '✗'}
                             </button>
-                            <button onClick={() => recordDecision(
-                              motion.id,
-                              "failed",
-                              document.getElementById(`summary-${motion.id}`).value
-                            )}>
-                              Record Failed
+                            <button 
+                              onClick={() => recordDecision(
+                                motion.id,
+                                "failed",
+                                document.getElementById(`summary-${motion.id}`).value
+                              )}
+                              disabled={hasPassedVotes && totalVotes > 0}
+                              style={hasPassedVotes && totalVotes > 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                              title={hasPassedVotes ? `Cannot record as failed: motion has ${yesVotes}/${requiredVotes} required votes` : ''}
+                            >
+                              Record Failed {hasFailedVotes || (totalVotes > 0 && !hasPassedVotes) ? '✓' : '✗'}
                             </button>
                           </>
                         )}
