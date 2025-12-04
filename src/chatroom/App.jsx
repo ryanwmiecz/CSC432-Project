@@ -74,11 +74,19 @@ const ChatMessage = ({ m, myData, users, onDelete, onShowProfile }) => {
           className="p-0 border-0 bg-transparent cursor-pointer mr-3 ml-3"
           aria-label={`View profile for ${sender}`}
         >
-          <img
-            src={senderImage}
-            alt={`${sender}'s avatar`}
-            className="w-8 h-8 rounded-full object-cover"
-          />
+          {senderImage === 'placeholder-avatar.png' ? (
+            <div
+              className="w-8 h-8 rounded-full"
+              style={{ backgroundColor: getRandomColorForUser(m.userId || m.id) }}
+            >
+            </div>
+          ) : (
+            <img
+              src={senderImage}
+              alt={`${sender}'s avatar`}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          )}
         </button>
 
         <div 
@@ -164,6 +172,25 @@ const readImageOverrides = () => {
     return {};
   }
 };
+// Generate a deterministic random color based on user ID
+const getRandomColorForUser = (userId) => {
+  if (!userId) return 'rgb(150, 150, 150)';
+  
+  // Simple hash function to generate consistent colors
+  let hash = 0;
+  const str = String(userId);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generate RGB values (avoid too dark or too light)
+  const r = ((hash & 0xFF0000) >> 16) % 180 + 60;
+  const g = ((hash & 0x00FF00) >> 8) % 180 + 60;
+  const b = (hash & 0x0000FF) % 180 + 60;
+  
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 const getImageFor = (id, fallback) => {
   const map = readImageOverrides();
   return (id && map[id]) || (fallback && map[fallback]) || fallback || 'placeholder-avatar.png';
@@ -1105,7 +1132,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
         </div>
         {/* Firebase project indicator removed from UI (kept console debug in config) */}
         <div className="user-profile flex items-center space-x-3">
-          <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+          {resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png') === 'placeholder-avatar.png' ? (
+            <div
+              className="w-8 h-8 rounded-full"
+              style={{ backgroundColor: getRandomColorForUser(myData.id) }}
+            >
+            </div>
+          ) : (
+            <img src={resolveUserImage({ userId: myData.id }, 'placeholder-avatar.png')} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
+          )}
           <span>{myData.displayName}</span>
           <span className="status">Online</span>
           <button onClick={() => navigate('/profile')} aria-label="Go to profile">Profile</button>
@@ -1125,7 +1160,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
               return (
                 <li key={user.id} className={`flex items-center space-x-2 ${isOnline ? '' : 'opacity-60'}`}>
                   <button onClick={() => setSelectedUser(user)} className="p-0 border-0 bg-transparent cursor-pointer">
-                    <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className={`w-8 h-8 rounded-full object-cover ${isOnline ? '' : 'grayscale'}`} />
+                    {avatarSrc === 'placeholder-avatar.png' ? (
+                      <div
+                        className={`w-8 h-8 rounded-full ${isOnline ? '' : 'grayscale'}`}
+                        style={{ backgroundColor: getRandomColorForUser(user.userId) }}
+                      >
+                      </div>
+                    ) : (
+                      <img src={avatarSrc} alt={`${user.name || 'User'} avatar`} className={`w-8 h-8 rounded-full object-cover ${isOnline ? '' : 'grayscale'}`} />
+                    )}
                   </button>
                   <div className="flex-1">
                     <div className={`font-semibold text-sm ${isOnline ? '' : 'text-gray-400'}`}>
@@ -1357,9 +1400,10 @@ const createSubMotion = async (parentMotionId, title, desc) => {
             </>
           )}
         </section>
-        <aside className="motions-section" ref={motionsRef}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', maxHeight: '40px'}}>
-            <h2 style={{ margin: 0 }}>Motions & Polls</h2>
+        {!showHome && (
+          <aside className="motions-section" ref={motionsRef}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', maxHeight: '40px'}}>
+              <h2 style={{ margin: 0 }}>Motions & Polls</h2>
             <div style={{ display: 'flex', gap: '5px', marginLeft: 'auto', flexShrink: 0 }}>
               <button
                 onClick={() => setMotionsTab('active')}
@@ -1710,6 +1754,7 @@ const createSubMotion = async (parentMotionId, title, desc) => {
             </div>
           )}
         </aside>
+        )}
         {/* User Profile Modal */}
         {selectedUser && (
           <div
@@ -1724,7 +1769,15 @@ const createSubMotion = async (parentMotionId, title, desc) => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center space-x-4 mb-4">
-                <img src={resolveUserImage(selectedUser, 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                {resolveUserImage(selectedUser, 'placeholder-avatar.png') === 'placeholder-avatar.png' ? (
+                  <div
+                    className="w-16 h-16 rounded-full"
+                    style={{ backgroundColor: getRandomColorForUser(selectedUser.userId || selectedUser.id) }}
+                  >
+                  </div>
+                ) : (
+                  <img src={resolveUserImage(selectedUser, 'placeholder-avatar.png')} alt="avatar" className="w-16 h-16 rounded-full object-cover" />
+                )}
                 <div>
                   <h3 className="text-white text-lg font-bold">{selectedUser.name || selectedUser.userId}</h3>
                   <div className="text-xs text-gray-400">{selectedUser.online ? 'Online' : 'Offline'}</div>
