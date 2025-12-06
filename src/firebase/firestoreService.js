@@ -118,10 +118,14 @@ export const subscribeToMessages = (chatroomId = null, callback, maxMessages = 1
     let serverCount = 0;
     
     querySnapshot.forEach((doc) => {
-      messages.push({
-        id: doc.id,
-        ...doc.data(),
-      });
+      const data = doc.data();
+      // Only include messages with resolved timestamps to prevent flashing
+      if (data.createdAt) {
+        messages.push({
+          id: doc.id,
+          ...data,
+        });
+      }
       // Track where data came from
       if (doc.metadata.fromCache) {
         cacheCount++;

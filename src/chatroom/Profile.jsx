@@ -3,12 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import { createOrUpdateUser } from '../firebase/firestoreService';
 
+// Generate a deterministic random color based on user ID
+const getRandomColorForUser = (userId) => {
+  if (!userId) return 'rgb(150, 150, 150)';
+  
+  // Simple hash function to generate consistent colors
+  let hash = 0;
+  const str = String(userId);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Generate RGB values (avoid too dark or too light)
+  const r = ((hash & 0xFF0000) >> 16) % 180 + 60;
+  const g = ((hash & 0x00FF00) >> 8) % 180 + 60;
+  const b = (hash & 0x0000FF) % 180 + 60;
+  
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [changeNameVal, setChangeNameVal] = useState('');
   const [changeBioVal, setChangeBioVal] = useState('');
   const [changeImgVal, setChangeImgVal] = useState('');
+  const [imgError, setImgError] = useState(false);
 
   // Local override helpers (display name and bio) so changes don't affect login identifiers.
   const DISPLAY_OVERRIDES_KEY = 'profile_display_overrides';
@@ -120,6 +140,7 @@ export default function ProfilePage() {
       // keep local inputs empty
       setChangeNameVal('');
       setChangeBioVal('');
+      setImgError(false);
     }
   }, [user]);
 
@@ -249,11 +270,21 @@ export default function ProfilePage() {
       <div className="bg-primary rounded-card p-8 w-full max-w-2xl flex flex-col shadow-card">
         {/* User Profile Section */}
         <div className="flex flex-col md:flex-row items-center gap-6 mb-8">
-          <img 
-            src={user.img} 
-            alt="avatar" 
-            className="w-24 h-24 object-cover rounded-full border-4 border-accent shadow-md" 
-          />
+          {!imgError && user.img && user.img !== 'public/vite.svg' ? (
+            <img 
+              src={user.img} 
+              alt="avatar" 
+              className="w-24 h-24 object-cover rounded-full border-4 border-accent shadow-md"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div 
+              className="w-24 h-24 rounded-full border-4 border-accent shadow-md flex items-center justify-center text-white text-3xl font-bold"
+              style={{ backgroundColor: getRandomColorForUser(user.username) }}
+            >
+              {(user.displayName || user.username).charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 text-center md:text-left">
             <h1 className="text-white text-3xl md:text-4xl font-bold mb-2">
               {user.displayName || user.username}
@@ -340,7 +371,7 @@ export default function ProfilePage() {
               onClick={handleBack}
               className="flex-1 bg-secondary text-primary font-semibold py-2.5 px-6 rounded-button hover:bg-opacity-80 transition-all duration-200"
             >
-              Back
+              Home
             </button>
             <button 
               onClick={handleLogout}
