@@ -21,3 +21,72 @@
 - Finished motion history
     <img width="2363" height="1115" alt="image" src="https://github.com/user-attachments/assets/8424855e-8c97-4e98-b776-8d54f85084dc" />
 
+## Data Structures
+
+### User Objects
+- **Location**: `src/auth/userStore.js`
+- **Structure**: `{ username, password, bio, img }`
+- **Storage**: LocalStorage-backed with compatibility wrapper for non-React code
+
+### Message Objects
+- **Location**: `src/firebase/firestoreService.js` (Firestore collection: `messages`)
+- **Structure**: `{ userId, userName, text, chatroomId, createdAt, updatedAt, userPhoto, attachment }`
+- **Features**: Real-time subscription, pagination, server timestamps
+
+### Committee Objects
+- **Location**: `src/firebase/firestoreService.js` (Firestore collection: `committees`)
+- **Structure**: `{ name, memberIds[], memberPermissions{}, createdAt, updatedAt }`
+- **Permissions**: `'Chair' | 'Member' | 'Observer'`
+
+### Motion Objects
+- **Location**: `src/firebase/firestoreService.js` (Firestore collection: `motions`)
+- **Structure**: `{ title, description, committeeId, authorId, status, votes{}, replies[], createdAt, updatedAt }`
+- **Status Values**: `0=Pending Second, 1=Discussion, 2=Voting, 3=Concluded` (Robert's Rules of Order)
+
+### React State Management
+- **Location**: `src/chatroom/App.jsx`
+- **Hooks**: `useState`, `useEffect`, `useRef`, `useMemo` for local component state
+- **Custom Hooks**: `src/firebase/hooks.js` (`useMessages`, `useCommittees`, `useMotions`, `useUsers`)
+
+### Rate Limiting
+- **Location**: `src/firebase/readLimiter.js`
+- **Structure**: Map-based cooldown tracker (3-second minimum between re-subscriptions)
+- **Purpose**: Prevents excessive Firebase reads during rapid UI updates
+
+## API Documentation
+
+### Firebase APIs
+- **Firestore Database** (`firebase/firestore`)
+  - Location: `src/firebase/config.js`, `src/firebase/firestoreService.js`
+  - Operations: Real-time subscriptions, CRUD operations, queries with pagination
+  - Collections: `messages`, `committees`, `motions`, `users`
+  - Features: Offline persistence, cache-first reads, server timestamps
+
+- **Firebase Authentication** (`firebase/auth`)
+  - Location: `src/firebase/config.js`
+  - Purpose: User authentication initialization
+
+### Auth0 Authentication
+- **Package**: `@auth0/auth0-react`
+- **Location**: `src/chatroom/App.jsx`
+- **Methods**: `useAuth0()` hook for user authentication state
+- **Storage**: Auth0 tokens stored in LocalStorage (`auth0_token`, `auth0_user`)
+
+### React Router
+- **Package**: `react-router-dom`
+- **Location**: `src/chatroom/App.jsx`
+- **Hook**: `useNavigate()` for programmatic navigation
+
+### React Core APIs
+- **Package**: `react`, `react-dom`
+- **Location**: Throughout `src/` components
+- **Hooks Used**: `useState`, `useEffect`, `useRef`, `useMemo`
+- **Entry Point**: `src/chatroom/main.jsx`
+
+### Vite Build Tool
+- **Configuration**: `src/vite.config.js`
+- **Environment Variables**: Firebase config via `import.meta.env.VITE_*`
+
+
+    
+
