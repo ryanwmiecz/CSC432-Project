@@ -219,10 +219,10 @@ const MotionHistory = ({ history }) => (
 );
 
 export default function App() {
-  const navigate = useNavigate();
-  const [messageInput, setMessageInput] = useState('');
   const [slowMode, setSlowMode] = useState(false);
   const [anonymousVoting, setAnonymousVoting] = useState(false);
+  const navigate = useNavigate();
+  const [messageInput, setMessageInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentCommitteeId, setCurrentCommitteeId] = useState(null);
   const [myData, setMyData] = useState({ displayName: "User", id: null, rank: "Member" });
@@ -1421,15 +1421,14 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                   </div>
                 )}
                 <div className="chat-input">
-                  <input
-                    type="text"
-                    placeholder="Type your message..."
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                    disabled={slowMode && !isChair}
-                    aria-label="Chat message input"
-                  />
+    <input
+  type="text"
+  placeholder="Type your message..."
+  value={messageInput}
+  onChange={(e) => setMessageInput(e.target.value)}
+  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+  aria-label="Chat message input"
+/>
                   <button onClick={() => sendMessage()} aria-label="Send message">Send</button>
                   <button onClick={handleEmojiClick} aria-label="Toggle emoji picker">Emoji</button>
                   <button onClick={handleUploadClick} aria-label="Upload image">Upload</button>
@@ -1751,27 +1750,6 @@ const createSubMotion = async (parentMotionId, title, desc) => {
                   </div>
                 );
               })}
-            </div>
-          )}
-          {isChair && (
-            <div className="control-panel">
-              <h3>Chair Controls</h3>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={slowMode}
-                  onChange={(e) => setSlowMode(e.target.checked)}
-                />
-                Enable Slow Mode
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={anonymousVoting}
-                  onChange={(e) => setAnonymousVoting(e.target.checked)}
-                />
-                Anonymous Voting
-              </label>
             </div>
           )}
           </>
