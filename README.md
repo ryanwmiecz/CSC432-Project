@@ -2,6 +2,8 @@
 - Link to site: https://csc432.netlify.app/
 - By: Salvatore, Ryan, and Augustine
 
+## Video Demo
+https://youtu.be/tA_poILM8KA 
 
 ## Features
 - Account creation and login
